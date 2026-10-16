@@ -15,8 +15,33 @@ A ticket in natural language, plus optional metadata (customer, channel, urgency
 - **Memory**: short-term (the session's conversation, via the checkpointer) and long-term (preferences and
   past tickets, in `udahub.db`)
 
+## Repository layout
+
+| Folder | Contents |
+|---|---|
+| `starter/` | The project workspace, with the implementation built on the course starter code |
+| `solution/` | A self-contained copy of the working project for reviewers, with its own guide in [`solution/README.md`](solution/README.md) |
+| `requirements.txt` | Python dependencies shared by both folders |
+
+The two folders hold the same code, and each runs on its own: paths are resolved relative to the folder.
 The architecture, routing rules and memory design are described in
-[`starter/agentic/design/README.md`](starter/agentic/design/README.md).
+[`solution/agentic/design/README.md`](solution/agentic/design/README.md).
+
+```
+<starter|solution>/
+├── 01_external_db_setup.ipynb   # builds data/external/cultpass.db
+├── 02_core_db_setup.ipynb       # builds data/core/udahub.db
+├── 03_agentic_app.ipynb         # demo scenarios and interactive chat
+├── agentic/
+│   ├── workflow.py              # LangGraph graph: `orchestrator`, `process_ticket()`
+│   ├── agents/                  # classifier, supervisor, resolvers, quality gate, escalation, memory
+│   ├── tools/                   # CultPass tools, RAG retriever, ticket and memory storage
+│   ├── design/README.md         # architecture
+│   ├── config.py                # models, paths and thresholds
+│   └── state.py                 # graph state and structured-output schemas
+├── data/                        # SQLAlchemy models, JSONL seed data and the SQLite databases
+└── tests/                       # offline unit and end-to-end tests
+```
 
 ## Getting Started
 
@@ -29,16 +54,20 @@ Python 3.11+ and an OpenAI API key. Python packages are listed in `requirements.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp starter/.env.example starter/.env   # then add your OPENAI_API_KEY
+cd solution                   # or starter
+cp .env.example .env          # then add your OPENAI_API_KEY (and OPENAI_BASE_URL if using Vocareum)
 ```
 
-Then run the notebooks in `starter/` in order:
+Then run the notebooks in order:
 
 1. `01_external_db_setup.ipynb` creates `data/external/cultpass.db` (customers, subscriptions, experiences, reservations)
 2. `02_core_db_setup.ipynb` creates `data/core/udahub.db` (account, 18 knowledge articles, tickets, demo history and memory)
-3. `03_agentic_app.ipynb` runs the demo scenarios and an interactive chat
+3. `03_agentic_app.ipynb` runs 8 demo scenarios and an interactive chat
 
-Programmatic use (from `starter/`):
+Both databases are committed, so steps 1 and 2 are only needed to reset the data. The demos make real
+bookings and cancellations, so re-run them after the demos to start fresh.
+
+Programmatic use (from `solution/` or `starter/`):
 
 ```python
 from agentic.workflow import orchestrator, process_ticket
@@ -48,7 +77,7 @@ print(state["final_response"])
 
 ## Testing
 
-From `starter/` (after running notebooks 01 and 02):
+From `solution/` or `starter/`:
 
 ```bash
 python -m pytest tests
@@ -73,16 +102,18 @@ The tests need no API key. Each one runs against a temporary copy of the databas
 
 ## Project Instructions
 
+Paths are relative to `solution/` (the same files exist in `starter/`).
+
 | Deliverable | Where |
 |---|---|
-| Multi-agent architecture (Supervisor, Classifier, Resolvers, Escalation) | `starter/agentic/agents/`, `starter/agentic/workflow.py` |
-| Architecture design | `starter/agentic/design/README.md` |
+| Multi-agent architecture (Supervisor, Classifier, Resolvers, Escalation) | `agentic/agents/`, `agentic/workflow.py` |
+| Architecture design | `agentic/design/README.md` |
 | Input handling (text + metadata) | `process_ticket(...)`, `load_context` |
 | Routing, RAG, resolve or escalate | `supervisor.py`, `knowledge_agent.py`, `quality_gate.py` |
-| Tools (incl. internal refund tool) | `starter/agentic/tools/` |
+| Tools (incl. internal refund tool) | `agentic/tools/` |
 | Memory (state, short-term, long-term) | `memory_agent.py`, `ticket_tools.py`, `CustomerMemory` model |
-| Knowledge base (≥ 14 articles) | `starter/data/external/cultpass_articles.jsonl` (18) |
-| Demo | `starter/03_agentic_app.ipynb` |
+| Knowledge base (≥ 14 articles) | `data/external/cultpass_articles.jsonl` (18) |
+| Demo | `03_agentic_app.ipynb` |
 
 ## Built With
 
