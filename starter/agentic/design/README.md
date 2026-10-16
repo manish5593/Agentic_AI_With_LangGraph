@@ -52,15 +52,15 @@ graph TD
 | Node | Type | Responsibility |
 |---|---|---|
 | `load_context` | deterministic | Resolves the ticket from `thread_id`, creating it in `udahub.db` if it doesn't exist yet. It identifies the customer from metadata (`external_user_id` or `email`), stores the inbound message, and recalls long-term memory. It also resets the per-turn fields. |
-| `classifier` | LLM, structured output | Produces a `TicketClassification` with issue type (11 categories), urgency, sentiment, whether account action is needed, whether a human was requested, any email mentioned, language and confidence. |
+| `classifier` | LLM, structured output | Produces a `TicketClassification` with issue type (11 categories), urgency, sentiment, whether account action is needed, whether a human was requested, any email mentioned, language and confidence. Recommendations and availability questions count as account work, because they need the real catalog. |
 | `supervisor` | deterministic | Links a guest ticket to a customer when the classifier found their email. It then applies the routing rules below. The LLM classifies, but the routing itself stays auditable and testable code. |
 | `knowledge_agent` | RAG | Retrieves the top 3 KB articles for the account. With no relevant article above the score threshold, it produces no draft and the ticket escalates. Otherwise it answers grounded in those articles, in the customer's language. |
-| `account_agent` | ReAct agent (`create_react_agent`) | Uses CultPass tools **bound to the current customer**: account, reservations, experience search, booking, cancellation, subscription changes, refund requests and KB search. It asks a clarifying question when the request is ambiguous. |
+| `account_agent` | ReAct agent (`create_react_agent`) | Uses CultPass tools **bound to the current customer**: account, reservations, experience search, booking, cancellation, subscription changes, refund requests and KB search. Booking and cancellation only accept ids that a lookup returned in the same turn. It recommends real experiences from the catalog, and asks a clarifying question when the request is ambiguous. |
 | `quality_gate` | LLM, structured output, plus rules | Scores the draft against the evidence (articles or tool results) for confidence, grounding, whether a human is needed and whether it waits on the customer. `should_escalate` then decides deterministically. |
 | `escalation_agent` | LLM, structured output | Picks the team and priority, writes a handoff note (stored as a `system` ticket message) and an empathetic reply. It never reveals block reasons and never promises refunds. |
 | `request_info` | deterministic | Asks the customer to identify themselves and keeps the ticket open (`awaiting_customer`). |
 | `finalize` | deterministic | Appends the reply to the conversation, persists it, and updates the ticket's status, issue type and tags. |
-| `write_memory` | LLM, structured output | Extracts durable preferences and facts from the exchange and stores them, skipping duplicates. Secrets and payment data are never stored. |
+| `write_memory` | LLM, structured output, plus filters | Extracts durable preferences, personal facts and reported issues as third-person summaries. Code then drops reservation state and one-off requests and skips duplicates. Secrets and payment data are never stored. |
 
 ## Routing rules (`supervisor.route_ticket`)
 
@@ -70,10 +70,13 @@ The rules are evaluated in order:
 2. Customer asked for a human → **escalation**
 3. `legal_or_safety` issue or `critical` urgency → **escalation**
 4. Classifier confidence < `0.5` → **escalation**
-5. Blocked customer with an account-related issue → **escalation** (Trust & Safety policy)
-6. Account data or action needed, customer unknown → **request_info**
-7. Account data or action needed (`reservation`, `subscription`, `billing_refund`, or `requires_account_action`) → **account_agent**
-8. Otherwise → **knowledge_agent**
+5. Blocked customer whose issue involves their account: login, reservations, subscription, billing, a complaint, or any account action → **escalation** (Trust & Safety policy)
+6. Identified customer reports a blocked account → **escalation**
+7. Account data or action needed, customer unknown → **request_info**
+8. Account data or action needed (`reservation`, `subscription`, `billing_refund`, or `requires_account_action`) → **account_agent**. This includes recommendations.
+9. Otherwise → **knowledge_agent**
+
+A blocked customer can still get answers to general questions, such as what a subscription includes.
 
 ## Resolve vs. escalate (`quality_gate.should_escalate`)
 
@@ -93,16 +96,38 @@ Thresholds are set in `agentic/config.py` and can be overridden with env vars.
 |---|---|---|
 | **State** | `UdaHubState` (LangGraph) | Classification, route, retrieved articles, tool actions, assessment and trace for the current step of the execution. |
 | **Short-term** | `MemorySaver` checkpointer, keyed by `thread_id` = ticket id | The session's conversation, customer and metadata, so follow-ups ("cancel *that one*") work within a session. |
-| **Long-term** | `udahub.db`: `customer_memory` table, plus `tickets` and `ticket_messages` | Customer preferences and facts, previous tickets (issue, status, last reply) and the full message log. These are recalled at the start of every new ticket for that customer. |
+| **Long-term** | `udahub.db`: `customer_memory` table, plus `tickets` and `ticket_messages` | Customer preferences, personal facts and reported issues, previous tickets (issue, status, last reply) and the full message log. These are recalled at the start of every new ticket for that customer. Only facts the customer stated are stored. State the system can look up live, such as reservations, is never stored, so it can't go stale. |
 
 ## Tools (`agentic/tools`)
 
 - `cultpass_tools.py`: plain functions over `cultpass.db` that enforce the business rules: blocked accounts, active
   subscription, premium tier, slots, monthly quota and ownership checks. `build_account_tools(user_id, ticket_id)`
-  wraps them as LangChain tools with the customer id bound in, so the LLM can't act on another account.
-- `knowledge_tools.py`: `KnowledgeRetriever` builds an `InMemoryVectorStore` with OpenAI embeddings over the account's
-  `knowledge` table. If embeddings are unavailable, it falls back to IDF keyword scoring.
-- `ticket_tools.py`: ticket creation and linking, message log, metadata updates, prior tickets, and long-term memory.
+  wraps them as LangChain tools with the customer id bound in, so the LLM can't act on another account. The
+  wrappers also refuse reservation and experience ids that no lookup returned in the same turn.
+- `knowledge_tools.py`: `KnowledgeRetriever` builds an `InMemoryVectorStore` with OpenAI embeddings
+  (`text-embedding-3-small`) over the account's `knowledge` table, and keeps articles scoring at least 0.30. If
+  embeddings are unavailable, it falls back to IDF keyword scoring.
+- `ticket_tools.py`: ticket creation and linking, message log, metadata updates, prior tickets, and long-term memory,
+  with a duplicate check that ignores case and punctuation.
+
+The tool tables are in [`../tools/README.md`](../tools/README.md).
+
+## Safeguards: the LLM proposes, code decides
+
+Each decision with real consequences is enforced in code rather than left to a prompt:
+
+| Risk | Safeguard | Where |
+|---|---|---|
+| Acting on another customer's account | Tools have the customer id bound in, and ownership is checked | `build_account_tools`, `cancel_reservation` |
+| Acting on a guessed id | Booking and cancellation refuse ids that no lookup returned in the same turn | `build_account_tools` |
+| Breaking business rules | Blocked accounts, subscription status, tier, slots, quota and double booking are checked before every change | `reserve_experience`, `manage_subscription` |
+| Promising a refund | Using `request_refund` always escalates, whatever the draft says | `should_escalate`, `ESCALATING_TOOLS` |
+| Answering a blocked account, legal issue or human request | Routing rules send these to escalation before any resolver runs | `route_ticket` |
+| Sending a wrong or unsupported answer | The draft is escalated when it isn't backed by the evidence or confidence is below 0.7 | `should_escalate` |
+| Storing stale or invented memories | Filters drop reservation state and one-off requests, and duplicates are skipped | `drop_reason`, `save_memory` |
+
+These rules are covered by the offline tests in `tests/`. The demo results in the [root README](../../../README.md#demo-results)
+show them working against the real model.
 
 ## Inputs and outputs
 
