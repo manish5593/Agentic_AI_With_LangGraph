@@ -7,13 +7,15 @@ subscription for cultural experiences.
 A ticket in natural language, plus optional metadata (customer, channel, urgency), goes through these agents:
 
 - **Classifier**: issue type, urgency, sentiment, language and confidence
-- **Supervisor**: identifies the customer and routes the ticket with auditable rules
+- **Supervisor**: identifies the customer and routes the ticket with auditable rules. Human requests, legal or critical issues,
+  blocked accounts and repeat problems go straight to a human
 - **Knowledge agent**: answers from the knowledge base with RAG
 - **Account agent**: uses CultPass tools (reservations, subscription, refund requests) scoped to the customer, which only accept ids it looked up
 - **Quality gate**: approves the answer or escalates it, based on confidence, grounding and policy
 - **Escalation agent**: hands off to the right human team with a summary
 - **Memory**: short-term (the session's conversation, via the checkpointer) and long-term (preferences,
-  reported issues and past tickets, in `udahub.db`), with filters that keep stale and one-off facts out
+  reported issues and past tickets, in `udahub.db`). Long-term memory is built only from the customer's own
+  messages, with filters that keep stale, one-off and personal details out
 
 Business rules and policies are enforced in code, not left to prompts: the LLM proposes, and code decides. See
 [Safeguards](solution/agentic/design/README.md#safeguards-the-llm-proposes-code-decides).
@@ -47,7 +49,7 @@ solution/
 
 | README | What it covers |
 |---|---|
-| [`solution/README.md`](solution/README.md) | Guide for reviewers: ticket flow, demo results, and where each requirement is met |
+| [`solution/README.md`](solution/README.md) | Project guide: ticket flow, demo results, and where each requirement is met |
 | [`agentic/design/`](solution/agentic/design/README.md) | Architecture, routing rules, resolve-or-escalate logic, memory, and safeguards |
 | [`agentic/agents/`](solution/agentic/agents/README.md) | Each agent node, the long-term memory rules, and how to add an agent |
 | [`agentic/tools/`](solution/agentic/tools/README.md) | Each tool and the rules it enforces, retrieval, and how to add a tool |
@@ -58,7 +60,7 @@ solution/
 
 ### Dependencies
 
-Python 3.11+ and an OpenAI API key. Python packages are listed in `requirements.txt`: LangGraph, LangChain, langchain-openai, NumPy (needed for embedding search), SQLAlchemy, python-dotenv and pytest.
+Python 3.11+ (tested with 3.11) and an OpenAI API key. Python packages are listed in `requirements.txt`: LangGraph, LangChain, langchain-openai, NumPy (needed for embedding search), SQLAlchemy, python-dotenv and pytest.
 
 ### Installation
 
@@ -144,19 +146,17 @@ The model's wording varies from run to run, but the routes and outcomes above we
 
 ## Project Instructions
 
-Paths are relative to `solution/`.
-
 | Deliverable | Where |
 |---|---|
-| Multi-agent architecture (Supervisor, Classifier, Resolvers, Escalation) | `agentic/agents/`, `agentic/workflow.py` |
-| Architecture design | `agentic/design/README.md` |
-| Input handling (text + metadata) | `process_ticket(...)`, `load_context` |
-| Routing, RAG, resolve or escalate | `supervisor.py`, `knowledge_agent.py`, `quality_gate.py` |
-| Tools (incl. internal refund tool) | `agentic/tools/` |
-| Memory (state, short-term, long-term) | `memory_agent.py`, `ticket_tools.py`, `CustomerMemory` model |
-| Knowledge base (≥ 14 articles) | `data/external/cultpass_articles.jsonl` (18) |
-| Demo (committed with outputs) | `03_agentic_app.ipynb` |
-| Safeguards enforced in code | `agentic/design/README.md#safeguards-the-llm-proposes-code-decides` |
+| Multi-agent architecture (Supervisor, Classifier, Resolvers, Escalation) | [`solution/agentic/agents/`](solution/agentic/agents/), [`solution/agentic/workflow.py`](solution/agentic/workflow.py) |
+| Architecture design | [`solution/agentic/design/README.md`](solution/agentic/design/README.md) |
+| Input handling (text + metadata) | `process_ticket()` in [`workflow.py`](solution/agentic/workflow.py), `load_context` in [`memory_agent.py`](solution/agentic/agents/memory_agent.py) |
+| Routing, RAG, resolve or escalate | [`supervisor.py`](solution/agentic/agents/supervisor.py), [`knowledge_agent.py`](solution/agentic/agents/knowledge_agent.py), [`quality_gate.py`](solution/agentic/agents/quality_gate.py) |
+| Tools (incl. internal refund tool) | [`solution/agentic/tools/`](solution/agentic/tools/) |
+| Memory (state, short-term, long-term) | [`memory_agent.py`](solution/agentic/agents/memory_agent.py), [`ticket_tools.py`](solution/agentic/tools/ticket_tools.py), `CustomerMemory` in [`udahub.py`](solution/data/models/udahub.py) |
+| Knowledge base (≥ 14 articles) | [`cultpass_articles.jsonl`](solution/data/external/cultpass_articles.jsonl) (18) |
+| Demo (committed with outputs) | [`03_agentic_app.ipynb`](solution/03_agentic_app.ipynb) |
+| Safeguards enforced in code | [Safeguards](solution/agentic/design/README.md#safeguards-the-llm-proposes-code-decides) |
 
 ## Built With
 
