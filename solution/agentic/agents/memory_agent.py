@@ -124,7 +124,7 @@ def finalize(state: dict) -> dict:
 
 class Memory(BaseModel):
     category: Literal["preference", "personal_fact", "issue_history"]
-    content: str = Field(description="Self-contained statement, e.g. 'Prefers replies in Portuguese'.")
+    content: str = Field(description="Self-contained third-person statement about the customer.")
 
 
 class MemoryExtraction(BaseModel):
@@ -140,6 +140,8 @@ From the conversation, extract ONLY durable information useful in future support
   kinds of experiences, cities, accessibility needs)
 - personal_fact: something the customer said about themselves that matters for support
 - issue_history: a significant problem the customer reported, such as a billing dispute or refund request
+Write every memory as a short third-person summary in your own words, never a quote of the customer.
+Use the forms "Prefers <...>", "Likes <...>", "<fact about the customer>", or "Reported <problem> (<outcome>)".
 Strict rules:
 - Every memory must be EXPLICITLY stated by the Customer in their own messages. Never infer, guess or
   generalise (one booking in a city does NOT mean they travel there often), and never take facts from the
@@ -147,6 +149,8 @@ Strict rules:
 - Do NOT store current account state that the system can look up and that goes stale: specific reservations,
   bookings or cancellations, event dates, subscription status, quota or ticket status.
 - Do NOT store secrets, passwords, payment data, or routine requests (e.g. "asked to cancel a reservation").
+- Do NOT store what the customer asked for in this ticket only: questions, requests to speak to a human,
+  complaints about the wait, or their mood. A request for a human is NOT a contact preference.
 - Do not repeat known memories.
 Most conversations contain nothing worth remembering: return an empty list unless a rule clearly applies.
 
@@ -159,6 +163,11 @@ Latest exchange:
 
 # Account state the system can look up live; stored as memory it only goes stale.
 _ACCOUNT_STATE = re.compile(r"\b(reserv\w*|book(ed|ing|ings)?|cancel\w*|quota)\b", re.IGNORECASE)
+# Requests made for the current ticket only, not lasting facts about the customer.
+_HUMAN_REQUEST = re.compile(
+    r"\b(talk|speak|chat)\w*\s+(to|with)\s+(a\s+)?(real\s+)?(person|human|agent|someone)\b|\b(real|live)\s+person\b",
+    re.IGNORECASE,
+)
 
 
 def is_account_state(memory: Memory) -> bool:
@@ -167,6 +176,15 @@ def is_account_state(memory: Memory) -> bool:
     Preferences are exempt, so "likes to book concerts" is still kept.
     """
     return memory.category != "preference" and bool(_ACCOUNT_STATE.search(memory.content))
+
+
+def drop_reason(memory: Memory):
+    """Why a memory must not be stored, or None if it can be kept."""
+    if is_account_state(memory):
+        return "account state"
+    if _HUMAN_REQUEST.search(memory.content):
+        return "one-off request"
+    return None
 
 
 def write_memory(state: dict) -> dict:
@@ -180,14 +198,14 @@ def write_memory(state: dict) -> dict:
             exchange=conversation_text(state),
         ))
     ])
-    dropped = [m.content for m in result.memories if is_account_state(m)]
+    dropped = [f"{m.content} ({drop_reason(m)})" for m in result.memories if drop_reason(m)]
     stored = [
         m.content for m in result.memories
-        if not is_account_state(m) and ticket_tools.save_memory(
+        if not drop_reason(m) and ticket_tools.save_memory(
             customer["account_id"], customer["udahub_user_id"], m.category, m.content, state["ticket_id"]
         )
     ]
     entry = f"[memory] stored {len(stored)} new memories: {stored}"
     if dropped:
-        entry += f" (dropped account state: {dropped})"
+        entry += f" | dropped: {dropped}"
     return {"trace": add_trace(state, entry)}

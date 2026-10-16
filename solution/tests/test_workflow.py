@@ -172,4 +172,4 @@ def test_account_state_memories_are_not_stored(run):
     stored = [m["content"] for m in ticket_tools.get_memories(state["customer"]["udahub_user_id"])]
     assert "Prefers replies in Portuguese" in stored
     assert not any("Samba" in m for m in stored)
-    assert "dropped account state" in state["trace"][-1]
+    assert "(account state)" in state["trace"][-1]

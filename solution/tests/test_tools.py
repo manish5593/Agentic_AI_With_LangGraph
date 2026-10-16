@@ -151,3 +151,13 @@ def test_account_tools_refuse_ids_not_looked_up():
     # a fresh turn starts with nothing looked up
     fresh = {t.name: t for t in cp.build_account_tools(BOB, "t-1")}
     assert fresh["cancel_my_reservation"].invoke({"reservation_id": "abc123"})["success"] is False
+
+
+def test_memory_filter_drops_one_off_human_requests():
+    from agentic.agents.memory_agent import Memory, drop_reason
+    for text in ["Wants to talk to a real person for assistance.", "Asked to speak with a human agent",
+                 "Demanded a live person"]:
+        assert drop_reason(Memory(category="personal_fact", content=text)) == "one-off request"
+    for text in ["Prefers to be contacted by email", "Reported being charged twice (refund requested)",
+                 "Is a human rights lawyer"]:
+        assert drop_reason(Memory(category="personal_fact", content=text)) is None
