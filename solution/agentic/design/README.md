@@ -47,6 +47,33 @@ graph TD
     linkStyle default stroke:#94a3b8,stroke-width:2px
 ```
 
+## Architecture pattern: Supervisor
+
+UDA-Hub follows the **Supervisor** pattern. One central node, the `supervisor`, decides which specialist worker
+handles each ticket. The workers never hand off to each other directly: every path returns through a shared
+review and finalisation step.
+
+| Pattern element | In UDA-Hub |
+|---|---|
+| Supervisor | `supervisor`: routes every ticket using the classifier's analysis and the customer's context |
+| Specialist workers | `knowledge_agent` (RAG), `account_agent` (tools), `escalation_agent` (human handoff), `request_info` |
+| Shared context | `UdaHubState`, the single state object that every node reads and updates |
+| Support stages | `load_context` and `classifier` run before the supervisor; `quality_gate`, `finalize` and `write_memory` run after the workers |
+
+Why Supervisor rather than the alternatives:
+
+- **Not Network.** In a network, agents hand tickets to each other freely. Support needs one accountable decision
+  point, so that policies like "blocked accounts go to Trust & Safety" are applied in one place, every time.
+- **Not Hierarchical.** Hierarchical setups have several layers of supervisors. With one product (CultPass) and four
+  workers there is nothing for a second layer to manage. Adding a platform would mean adding workers and routes,
+  not another supervisor.
+- **The supervisor's routing is code, not an LLM.** The LLM classifies the ticket, and `route_ticket()` turns that
+  classification into a route with explicit rules. This makes every routing decision predictable, testable and
+  explained in the trace. It is also why the project uses a custom `StateGraph` rather than `langgraph-supervisor`,
+  whose supervisor is an LLM that chooses the handoff itself.
+- **A quality gate reviews the workers' output.** A worker's draft is never sent directly. The `quality_gate` checks
+  it, and can still send the ticket to escalation.
+
 ## Agents
 
 | Node | Type | Responsibility |
@@ -61,6 +88,25 @@ graph TD
 | `request_info` | deterministic | Asks the customer to identify themselves and keeps the ticket open (`awaiting_customer`). |
 | `finalize` | deterministic | Appends the reply to the conversation, persists it, and updates the ticket's status, issue type and tags. |
 | `write_memory` | LLM, structured output, plus filters | Extracts durable preferences, personal facts and reported issues as third-person summaries. Code then drops reservation state and one-off requests and skips duplicates. Secrets and payment data are never stored. |
+
+## Information flow
+
+One graph run handles one customer message. Each node reads the shared state and writes only its own fields:
+
+| Step | Node | Reads | Writes |
+|---|---|---|---|
+| 1 | `load_context` | `messages`, `metadata`, `thread_id` | `ticket_id`, `customer`, `memories`, `prior_tickets`, `ticket_history`, `ticket_status`, `ticket_issue_type`. It also resets the per-turn fields and saves the customer's message to `udahub.db`. |
+| 2 | `classifier` | conversation, customer context | `classification`: issue type, urgency, sentiment, language, whether account action or a human is needed, any email, confidence |
+| 3 | `supervisor` | `classification`, `customer`, `prior_tickets`, `ticket_status` | `route`, `route_reason`. A guest is linked to their account if the classifier found their email. |
+| 4a | `knowledge_agent` | `classification`, conversation, customer context | `knowledge` (retrieved articles), `draft_response` |
+| 4b | `account_agent` | conversation, customer context | `actions_taken` (every tool call and result), `draft_response` |
+| 4c | `request_info` | `classification` | `final_response` (asks for the customer's email) |
+| 5 | `quality_gate` | `draft_response`, `knowledge`, `actions_taken`, `prior_tickets` | `assessment`. Then `should_escalate()` picks `approve` or `escalation_agent`. |
+| 6 | `approve` or `escalation_agent` | the draft, or everything above | `final_response`. Escalation also writes `escalation` (team, priority, summary, steps taken) and saves a handoff note to the ticket. |
+| 7 | `finalize` | `final_response`, `route`, `escalation`, `assessment` | `messages` (the reply), `ticket_status`. It also saves the reply and the ticket's status, issue type and tags. |
+| 8 | `write_memory` | the customer's messages only | New rows in `customer_memory`, after the filters |
+
+Every node also appends one line to `trace`, so each decision can be audited after the fact.
 
 ## Routing rules (`supervisor.route_ticket`)
 
@@ -136,6 +182,10 @@ show them working against the real model.
 
 ## Inputs and outputs
 
+### Input
+
+Each call carries one customer message, plus optional ticket metadata:
+
 ```python
 from agentic.workflow import orchestrator, process_ticket
 
@@ -144,7 +194,57 @@ state = process_ticket(
     ticket_id="T-123",                         # = thread_id
     metadata={"email": "bob.stone@granite.com", "channel": "email", "urgency": "high"},
 )
-state["final_response"], state["route"], state["escalation"], state["trace"]
 ```
 
-`orchestrator` also works with the course-provided `utils.chat_interface(orchestrator, ticket_id)`.
+| Field | Required | Meaning |
+|---|---|---|
+| message text | Yes | The customer's message, in any language |
+| `ticket_id` | Yes | Identifies the ticket. It is also the LangGraph `thread_id`, so follow-ups continue the same conversation. |
+| `metadata.external_user_id` or `metadata.email` | No | Identifies the customer on the platform |
+| `metadata.user_name` | No | Name for a newly created user |
+| `metadata.account_id` | No | The platform; defaults to `cultpass` |
+| `metadata.channel` | No | `chat`, `email`, and so on; defaults to `chat` |
+| `metadata.urgency` | No | The urgency reported by the source system. It is shown to the classifier, which sets the final urgency. |
+| `metadata.tags` | No | Initial ticket tags |
+
+`orchestrator` also works with the course-provided `utils.chat_interface(orchestrator, ticket_id)`, which sends
+messages only.
+
+### How each kind of input is handled
+
+| Input | Handling |
+|---|---|
+| Known customer (id or email in metadata) | The account, subscription, preferences and past tickets are loaded before classification |
+| Unknown customer, how-to or policy question | Answered from the knowledge base; nothing is stored about them |
+| Unknown customer who needs an account action | `request_info` asks for their email, and the ticket waits (`awaiting_customer`) |
+| Customer who writes their email in the message | The supervisor finds the account, links the ticket to it, and continues |
+| Follow-up on the same ticket | The checkpointer supplies the earlier conversation, so "cancel *that one*" works |
+| Ticket that already exists in `udahub.db` | Its earlier messages are loaded as history |
+| Problem the customer reported before | Escalated straight away as a repeat issue |
+| Ticket already escalated | New messages are forwarded to the human team |
+| Request for a human, legal or safety issue, critical urgency | Escalated straight away |
+| Blocked account with an account issue | Escalated to Trust & Safety, without revealing the reason for the block |
+| Ambiguous or off-topic message (classifier confidence < 0.5) | Escalated rather than guessed at |
+| Message in another language | Classified with its language, and answered in that language. The one exception is `request_info`'s fixed request for an email, which is in English. |
+
+### Output
+
+`process_ticket()` returns the final state for the turn:
+
+| Field | Contents |
+|---|---|
+| `final_response` | The reply sent to the customer |
+| `ticket_status` | `resolved`, `awaiting_customer` or `escalated` |
+| `route`, `route_reason` | Which worker handled the ticket, and why |
+| `classification` | The classifier's analysis |
+| `knowledge`, `actions_taken` | The articles used and the tool calls made, with their results |
+| `assessment` | The quality gate's confidence, grounding and needs-a-human verdict |
+| `escalation` | For escalated tickets: team, priority, summary, steps taken and recommended next step |
+| `trace` | One line per decision, in order |
+
+The run also writes to the databases:
+- the customer's message and the reply, logged in `ticket_messages`;
+- the ticket's status, issue type and tags, in `ticket_metadata`;
+- for escalations, a handoff note, and for refund requests, a reference number;
+- new long-term memories, in `customer_memory`;
+- any bookings, cancellations or subscription changes, in `cultpass.db`.
