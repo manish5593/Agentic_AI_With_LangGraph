@@ -147,4 +147,4 @@ state = process_ticket(
 state["final_response"], state["route"], state["escalation"], state["trace"]
 ```
 
-`orchestrator` also works with the starter's `utils.chat_interface(orchestrator, ticket_id)`.
+`orchestrator` also works with the course-provided `utils.chat_interface(orchestrator, ticket_id)`.

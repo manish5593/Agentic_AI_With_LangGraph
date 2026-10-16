@@ -22,17 +22,13 @@ Business rules and policies are enforced in code, not left to prompts: the LLM p
 
 ## Repository layout
 
-| Folder | Contents |
+| Path | Contents |
 |---|---|
-| `starter/` | The project workspace, with the implementation built on the course starter code |
-| `solution/` | A self-contained copy of the working project for reviewers, with its own guide in [`solution/README.md`](solution/README.md) |
-| `requirements.txt` | Python dependencies shared by both folders |
-
-The two folders hold the same code, data and executed notebooks, and each runs on its own: paths are resolved
-relative to the folder.
+| `solution/` | The complete, working project, with its own guide in [`solution/README.md`](solution/README.md) |
+| `requirements.txt` | Python dependencies |
 
 ```
-<starter|solution>/
+solution/
 ├── 01_external_db_setup.ipynb   # rebuilds data/external/cultpass.db
 ├── 02_core_db_setup.ipynb       # rebuilds data/core/udahub.db
 ├── 03_agentic_app.ipynb         # demo scenarios (committed with outputs) and interactive chat
@@ -57,7 +53,6 @@ relative to the folder.
 | [`agentic/tools/`](solution/agentic/tools/README.md) | Each tool and the rules it enforces, retrieval, and how to add a tool |
 | [`data/core/`](solution/data/core/README.md) | `udahub.db`: tables, committed contents, and how the agents write to it |
 | [`data/external/`](solution/data/external/README.md) | `cultpass.db`: demo customers, resetting, and adding data |
-| [`starter/README.md`](starter/README.md) | Quick start for the workspace |
 
 ## Getting Started
 
@@ -70,7 +65,7 @@ Python 3.11+ and an OpenAI API key. Python packages are listed in `requirements.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cd solution                   # or starter
+cd solution
 cp .env.example .env          # then add your OPENAI_API_KEY (and OPENAI_BASE_URL if using Vocareum)
 ```
 
@@ -83,7 +78,7 @@ the demos make real bookings and cancellations, and store tickets and memories.
 1. `01_external_db_setup.ipynb` rebuilds `data/external/cultpass.db` (customers, subscriptions, experiences, reservations)
 2. `02_core_db_setup.ipynb` rebuilds `data/core/udahub.db` (account, 18 knowledge articles, tickets, demo history and memory)
 
-Programmatic use (from `solution/` or `starter/`):
+Programmatic use (from `solution/`):
 
 ```python
 from agentic.workflow import orchestrator, process_ticket
@@ -93,7 +88,7 @@ print(state["final_response"])
 
 ## Testing
 
-From `solution/` or `starter/`:
+From `solution/`:
 
 ```bash
 python -m pytest tests
@@ -125,7 +120,7 @@ The tests need no API key. Each one runs against a temporary copy of the databas
 
 These are the results of running the 8 scenarios in `03_agentic_app.ipynb` against the real model (`gpt-4o-mini`
 with `text-embedding-3-small` for retrieval). The executed notebook, with every decision trace and reply, is
-committed in both `starter/` and `solution/`.
+committed in `solution/`.
 
 | # | Ticket | Route and tools | Outcome | Long-term memory |
 |---|---|---|---|---|
@@ -149,7 +144,7 @@ The model's wording varies from run to run, but the routes and outcomes above we
 
 ## Project Instructions
 
-Paths are relative to `solution/` (the same files exist in `starter/`).
+Paths are relative to `solution/`.
 
 | Deliverable | Where |
 |---|---|
