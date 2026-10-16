@@ -9,3 +9,4 @@ langgraph-supervisor>=0.0.28
 langgraph>=0.5.4
 python-dotenv>=1.1.1
 sqlalchemy>=2.0.41
+pytest>=8.0

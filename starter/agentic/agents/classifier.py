@@ -1,0 +1,41 @@
+"""Classifier agent: understands the ticket and produces a structured classification."""
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from agentic.agents.common import add_trace, conversation_text, customer_context_block
+from agentic.llm import get_llm
+from agentic.state import TicketClassification
+
+CLASSIFIER_PROMPT = """You are the triage classifier of UDA-Hub, the customer support platform of CultPass,
+a subscription that gives members access to cultural experiences (museums, concerts, tours...).
+
+Classify the customer's CURRENT request (the latest customer message, using earlier messages as context).
+
+Issue types:
+- login_access: cannot log in, password reset, verification emails
+- reservation: book, cancel, check or change reservations; QR codes; attendance
+- subscription: plan details, tiers, quota, pause/cancel/resume subscription
+- billing_refund: charges, payment methods, invoices, refunds
+- account_blocked: the customer says the account is blocked/suspended/restricted
+- technical: app crashes, errors, bugs
+- account_privacy: change email/profile, delete account, personal data
+- general_info: how the service works, what is included, opening hours
+- complaint: dissatisfaction without a specific actionable request
+- legal_or_safety: legal threats, fraud, data-protection complaints, harassment, safety incidents
+- other: anything else
+
+Urgency: low (informational), medium (needs help soon), high (blocked from using the service or an
+event is imminent), critical (safety risk, legal threat, fraud).
+Set confidence low (<0.5) when the request is ambiguous or unrelated to CultPass."""
+
+
+def classify(state: dict) -> dict:
+    llm = get_llm().with_structured_output(TicketClassification)
+    result: TicketClassification = llm.invoke([
+        SystemMessage(content=CLASSIFIER_PROMPT),
+        HumanMessage(content=f"Context:\n{customer_context_block(state)}\n\n"
+                             f"Conversation:\n{conversation_text(state)}"),
+    ])
+    c = result.model_dump()
+    entry = (f"[classifier] {c['issue_type']} urgency={c['urgency']} sentiment={c['sentiment']} "
+             f"account_action={c['requires_account_action']} confidence={c['confidence']:.2f}")
+    return {"classification": c, "trace": add_trace(state, entry)}

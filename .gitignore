@@ -2,3 +2,6 @@
 .idea/
 __pycache__/
 .env
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/

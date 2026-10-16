@@ -121,3 +121,20 @@ class Knowledge(Base):
 
     def __repr__(self):
         return f"<Knowledge(article_id='{self.article_id}', title='{self.title}')>"
+
+
+class CustomerMemory(Base):
+    """Long-term memory: durable facts and preferences about a customer,
+    recalled across tickets and sessions."""
+    __tablename__ = 'customer_memory'
+    memory_id = Column(String, primary_key=True)
+    account_id = Column(String, ForeignKey('accounts.account_id'), nullable=False)
+    user_id = Column(String, ForeignKey('users.user_id'), nullable=False)
+    category = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    source_ticket_id = Column(String, ForeignKey('tickets.ticket_id'))
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<CustomerMemory(user_id='{self.user_id}', category='{self.category}', content='{self.content[:30]}')>"

@@ -1,0 +1,28 @@
+"""Central configuration for UDA-Hub. Values can be overridden via env vars."""
+import os
+from pathlib import Path
+
+STARTER_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = STARTER_DIR / "data"
+
+UDAHUB_DB_PATH = Path(os.getenv("UDAHUB_DB_PATH", DATA_DIR / "core" / "udahub.db"))
+CULTPASS_DB_PATH = Path(os.getenv("CULTPASS_DB_PATH", DATA_DIR / "external" / "cultpass.db"))
+
+DEFAULT_ACCOUNT_ID = os.getenv("UDAHUB_DEFAULT_ACCOUNT", "cultpass")
+GUEST_EXTERNAL_USER_ID = "guest"
+
+CHAT_MODEL = os.getenv("UDAHUB_CHAT_MODEL", "gpt-4o-mini")
+EMBEDDING_MODEL = os.getenv("UDAHUB_EMBEDDING_MODEL", "text-embedding-3-small")
+
+# Decision thresholds
+CLASSIFIER_MIN_CONFIDENCE = float(os.getenv("UDAHUB_CLASSIFIER_MIN_CONFIDENCE", 0.5))
+RESOLUTION_MIN_CONFIDENCE = float(os.getenv("UDAHUB_RESOLUTION_MIN_CONFIDENCE", 0.7))
+# Minimum retrieval score for a KB article to count as relevant
+RAG_MIN_SCORE_EMBEDDING = float(os.getenv("UDAHUB_RAG_MIN_SCORE", 0.30))
+RAG_MIN_SCORE_KEYWORD = 0.10
+RAG_TOP_K = 3
+
+# How much context is fed to the agents
+MAX_CONVERSATION_MESSAGES = 12
+MAX_PRIOR_TICKETS = 3
+MAX_MEMORIES = 10
