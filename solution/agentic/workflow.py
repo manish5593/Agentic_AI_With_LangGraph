@@ -8,6 +8,8 @@
 
 See agentic/design/README.md for the full architecture.
 """
+import logging
+import traceback
 from typing import Optional
 
 from langchain_core.messages import HumanMessage
@@ -21,7 +23,14 @@ from agentic.agents.knowledge_agent import resolve_with_knowledge
 from agentic.agents.memory_agent import finalize, load_context, write_memory
 from agentic.agents.quality_gate import approve, assess_resolution, should_escalate
 from agentic.agents.supervisor import request_info, supervise
+from agentic.event_log import log_event
 from agentic.state import UdaHubState
+from agentic.tools import ticket_tools
+
+logger = logging.getLogger("udahub")
+
+FALLBACK_REPLY = ("Sorry, something went wrong on our side while handling your message. "
+                  "A member of our support team will follow up with you by email.")
 
 
 def _after_supervisor(state: UdaHubState) -> str:
@@ -80,4 +89,26 @@ def process_ticket(text: str, ticket_id: str, metadata: Optional[dict] = None, a
     payload = {"messages": [HumanMessage(content=text)]}
     if metadata:
         payload["metadata"] = metadata
-    return agent.invoke(payload, config={"configurable": {"thread_id": ticket_id}})
+    try:
+        return agent.invoke(payload, config={"configurable": {"thread_id": ticket_id}})
+    except Exception as exc:
+        return _handle_failure(ticket_id, exc)
+
+
+def _handle_failure(ticket_id: str, exc: Exception) -> dict:
+    """Never leave a customer without a reply: log the failure, flag the ticket for a human, and send
+    a safe fallback. Covers e.g. the LLM being unreachable or an unknown account in the metadata."""
+    entry = f"[workflow] failed: {type(exc).__name__}: {str(exc)[:200]}"
+    # The traceback goes in the structured event, not the console, which only gets a one-line warning
+    logger.warning("Ticket %s failed: %s: %s", ticket_id, type(exc).__name__, str(exc)[:200])
+    log_event(ticket_id, "workflow", "error", entry, error_type=type(exc).__name__, error=str(exc)[:500],
+              traceback=traceback.format_exc())
+    try:
+        if ticket_tools.ticket_exists(ticket_id):
+            ticket_tools.add_message(ticket_id, "system", f"Automatic handling failed ({type(exc).__name__}); needs a human.")
+            ticket_tools.add_message(ticket_id, "ai", FALLBACK_REPLY)
+            ticket_tools.update_ticket_metadata(ticket_id, status="escalated", tags="system_error")
+    except Exception:
+        logger.exception("Could not flag ticket %s after a failure", ticket_id)
+    return {"ticket_id": ticket_id, "route": None, "ticket_status": "error", "final_response": FALLBACK_REPLY,
+            "error": f"{type(exc).__name__}: {exc}", "trace": [entry]}

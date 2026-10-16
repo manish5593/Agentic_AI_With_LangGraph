@@ -33,7 +33,8 @@ The LLM proposes memories, and code then decides what is stored:
 ## Adding an agent
 
 1. Write a node function that takes the state and returns only the fields it changes. Include
-   `"trace": add_trace(state, "[my_agent] ...")` so the decision is auditable.
+   `"trace": add_trace(state, "[my_agent] ...", event="my_event", **fields)`. That records the decision in
+   the trace and as a structured event in the searchable log.
 2. Add any new fields to `UdaHubState` in `../state.py`, and reset per-turn fields in `load_context`.
 3. Register the node and its edges in `build_graph()` in `../workflow.py`. For a new route, add it to
    `route_ticket()` and to the supervisor's conditional edges.

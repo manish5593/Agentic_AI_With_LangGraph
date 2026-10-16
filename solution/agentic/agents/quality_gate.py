@@ -38,7 +38,7 @@ def assess_resolution(state: dict) -> dict:
         assessment = {"confidence": 0.0, "grounded": False, "answered_by_evidence": False,
                       "needs_human": True, "awaiting_customer": False, "reason": reason}
         return {"assessment": assessment,
-                "trace": add_trace(state, f"[quality_gate] {assessment['reason']}")}
+                "trace": add_trace(state, f"[quality_gate] {assessment['reason']}", event="assess", **assessment)}
 
     evidence = []
     if state.get("knowledge"):
@@ -56,7 +56,8 @@ def assess_resolution(state: dict) -> dict:
     assessment = result.model_dump()
     return {"assessment": assessment, "trace": add_trace(
         state, f"[quality_gate] confidence={assessment['confidence']:.2f} grounded={assessment['grounded']} "
-               f"needs_human={assessment['needs_human']}: {assessment['reason']}")}
+               f"needs_human={assessment['needs_human']}: {assessment['reason']}",
+        event="assess", **assessment)}
 
 
 def should_escalate(state: dict) -> tuple[bool, str]:
@@ -80,4 +81,4 @@ def should_escalate(state: dict) -> tuple[bool, str]:
 
 def approve(state: dict) -> dict:
     return {"final_response": state["draft_response"],
-            "trace": add_trace(state, "[quality_gate] approved draft")}
+            "trace": add_trace(state, "[quality_gate] approved draft", event="approve")}

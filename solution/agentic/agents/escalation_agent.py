@@ -55,5 +55,6 @@ def escalate(state: dict) -> dict:
     return {
         "escalation": {"reason": reason, **h},
         "final_response": h["customer_message"],
-        "trace": add_trace(state, f"[escalation_agent] -> {h['team']} ({h['priority']}): {reason}"),
+        "trace": add_trace(state, f"[escalation_agent] -> {h['team']} ({h['priority']}): {reason}",
+                           event="escalate", team=h["team"], priority=h["priority"], reason=reason),
     }

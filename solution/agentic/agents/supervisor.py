@@ -42,6 +42,8 @@ def route_ticket(classification: dict, customer: dict, ticket_status: str,
     """Return (route, reason). Pure function so the decision logic is easy to test."""
     c = classification
     urgency = effective_urgency(c.get("urgency"), reported_urgency)
+    if c.get("empty_message"):
+        return "request_info", "empty message: asking the customer to describe their issue"
     if ticket_status == "escalated":
         return "escalation_agent", "ticket is already with the human team; forwarding the new information"
     if c.get("human_requested"):
@@ -82,15 +84,16 @@ def supervise(state: dict) -> dict:
             ticket = ticket_tools.get_or_create_ticket(state["ticket_id"])
             customer = build_customer(ticket)
             update.update(customer=customer, **recall(customer, state["ticket_id"]))
-            state = {**state, "trace": add_trace(state, f"[supervisor] identified customer {profile['name']} via {email}")}
+            state = {**state, "trace": add_trace(state, f"[supervisor] identified customer {profile['name']} via {email}",
+                                             event="identify", customer=profile["user_id"])}
         else:
-            state = {**state, "trace": add_trace(state, f"[supervisor] no customer found for {email}")}
+            state = {**state, "trace": add_trace(state, f"[supervisor] no customer found for {email}", event="identify", customer=None)}
 
     route, reason = route_ticket(state["classification"], customer, state.get("ticket_status", "open"),
                                  frozenset(repeat_issue_types({**state, **update})),
                                  reported_urgency=(state.get("metadata") or {}).get("urgency"))
     update.update(route=route, route_reason=reason,
-                  trace=add_trace(state, f"[supervisor] route -> {route}: {reason}"))
+                  trace=add_trace(state, f"[supervisor] route -> {route}: {reason}", event="route", route=route, reason=reason))
     return update
 
 
@@ -99,6 +102,8 @@ REQUEST_INFO_MESSAGE = (
     "address registered with your CultPass account?"
 )
 
+
+EMPTY_MESSAGE_REPLY = "Hi! It looks like your message came through empty. What can I help you with today?"
 
 TRANSLATE_PROMPT = """Translate this customer support message into {language}.
 Keep the meaning, the friendly tone and any email address exactly as they are.
@@ -119,9 +124,13 @@ def request_info(state: dict) -> dict:
     classification = state.get("classification") or {}
     email = classification.get("customer_email")
     message = REQUEST_INFO_MESSAGE
+    if classification.get("empty_message"):
+        message = EMPTY_MESSAGE_REPLY
     if email:
         message = (f"I couldn't find a CultPass account registered with {email}. Could you double-check "
                    "the email address you use to log in to CultPass?")
     language = classification.get("language", "English")
+    asked = "what they need help with" if classification.get("empty_message") else "to identify themselves"
     return {"final_response": _in_customer_language(message, language),
-            "trace": add_trace(state, f"[request_info] asked customer to identify themselves ({language})")}
+            "trace": add_trace(state, f"[request_info] asked customer {asked} ({language})",
+                               event="request_info", asked=asked, language=language)}

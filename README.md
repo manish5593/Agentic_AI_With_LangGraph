@@ -116,6 +116,9 @@ The tests need no API key. Each one runs against a temporary copy of the databas
   - a refund request that forces escalation and stores a new memory
   - a memory about reservation state that is filtered out before it reaches the database
   - a memory writer that only sees the customer's messages, never the assistant's replies
+  - a structured event for every agent decision, routing choice and tool call, searchable by any field
+  - an LLM outage or unknown account that returns a fallback reply and flags the ticket instead of crashing
+  - an empty message that is answered without calling the LLM
   - a repeat issue, from a previous ticket and from earlier on the same ticket, that goes straight to a human
 
 ## Demo Results
@@ -162,6 +165,8 @@ The model's wording varies from run to run, but the routes and outcomes above we
 | Memory (state, short-term, long-term) | [`memory_agent.py`](solution/agentic/agents/memory_agent.py), [`ticket_tools.py`](solution/agentic/tools/ticket_tools.py), `CustomerMemory` in [`udahub.py`](solution/data/models/udahub.py). Notebook 03 shows a returning customer's stored history, a fresh session picking up a ticket from the database, inspecting a ticket by `thread_id`, and a preference learned in one session and used in another (scenarios 12 and 13). |
 | Knowledge base (≥ 14 articles) | [`cultpass_articles.jsonl`](solution/data/external/cultpass_articles.jsonl) (18) |
 | Demo (committed with outputs) | [`03_agentic_app.ipynb`](solution/03_agentic_app.ipynb) |
+| Structured, searchable logs | [`event_log.py`](solution/agentic/event_log.py) writes every decision to `logs/events.jsonl`. Notebook 03 searches it, and the [Logging](solution/agentic/design/README.md#logging) section lists the fields. |
+| Error handling and edge cases | `process_ticket()` in [`workflow.py`](solution/agentic/workflow.py). Notebook 03's "Edge cases" cell covers an empty message, gibberish, an unknown customer, an unknown account and an LLM outage. |
 | Safeguards enforced in code | [Safeguards](solution/agentic/design/README.md#safeguards-the-llm-proposes-code-decides) |
 
 ## Built With

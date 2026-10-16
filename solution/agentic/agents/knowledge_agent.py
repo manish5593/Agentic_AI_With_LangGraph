@@ -32,7 +32,7 @@ def resolve_with_knowledge(state: dict) -> dict:
             "knowledge": [],
             "draft_response": None,
             "resolver": "knowledge_agent",
-            "trace": add_trace(state, "[knowledge_agent] no relevant article found"),
+            "trace": add_trace(state, "[knowledge_agent] no relevant article found", event="retrieve", articles=[]),
         }
 
     response = get_llm().invoke([
@@ -47,5 +47,6 @@ def resolve_with_knowledge(state: dict) -> dict:
         "knowledge": articles,
         "draft_response": response.content,
         "resolver": "knowledge_agent",
-        "trace": add_trace(state, f"[knowledge_agent] retrieved {titles}"),
+        "trace": add_trace(state, f"[knowledge_agent] retrieved {titles}", event="retrieve",
+                           articles=[{"title": a["title"], "score": a["score"]} for a in articles]),
     }

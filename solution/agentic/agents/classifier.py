@@ -1,7 +1,7 @@
 """Classifier agent: understands the ticket and produces a structured classification."""
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from agentic.agents.common import add_trace, conversation_text, customer_context_block
+from agentic.agents.common import add_trace, conversation_text, customer_context_block, last_user_message
 from agentic.llm import get_llm
 from agentic.state import TicketClassification
 
@@ -30,7 +30,16 @@ event is imminent), critical (safety risk, legal threat, fraud).
 Set confidence low (<0.5) when the request is ambiguous or unrelated to CultPass."""
 
 
+EMPTY_MESSAGE = {"issue_type": "other", "urgency": "low", "sentiment": "neutral", "summary": "empty message",
+                 "requires_account_action": False, "human_requested": False, "customer_email": None,
+                 "language": "English", "confidence": 1.0, "empty_message": True}
+
+
 def classify(state: dict) -> dict:
+    if not last_user_message(state).strip():
+        # Nothing to classify: no LLM call, the supervisor asks the customer what they need
+        return {"classification": dict(EMPTY_MESSAGE), "trace": add_trace(
+            state, "[classifier] empty message", event="classify", issue_type="other", empty_message=True)}
     llm = get_llm().with_structured_output(TicketClassification)
     result: TicketClassification = llm.invoke([
         SystemMessage(content=CLASSIFIER_PROMPT),
@@ -40,4 +49,7 @@ def classify(state: dict) -> dict:
     c = result.model_dump()
     entry = (f"[classifier] {c['issue_type']} urgency={c['urgency']} sentiment={c['sentiment']} "
              f"account_action={c['requires_account_action']} confidence={c['confidence']:.2f}")
-    return {"classification": c, "trace": add_trace(state, entry)}
+    return {"classification": c, "trace": add_trace(
+        state, entry, event="classify",
+        **{k: c[k] for k in ("issue_type", "urgency", "sentiment", "requires_account_action",
+                             "human_requested", "language", "confidence")})}

@@ -75,6 +75,7 @@ def load_context(state: dict, config: RunnableConfig) -> dict:
         ticket_tools.add_message(ticket_id, "user", user_text)
 
     customer = build_customer(ticket)
+    recalled = recall(customer, ticket_id)
     entry = (f"[memory] ticket={ticket_id} customer={customer.get('name')} "
              f"identified={customer['identified']} status={ticket['status']}")
     return {
@@ -85,7 +86,7 @@ def load_context(state: dict, config: RunnableConfig) -> dict:
         "ticket_issue_type": ticket["main_issue_type"],
         "ticket_history": history,
         "customer": customer,
-        **recall(customer, ticket_id),
+        **recalled,
         # reset per-turn fields
         "classification": {},
         "route": None,
@@ -97,7 +98,10 @@ def load_context(state: dict, config: RunnableConfig) -> dict:
         "assessment": {},
         "escalation": None,
         "final_response": "",
-        "trace": add_trace({}, entry),  # trace is per turn
+        "trace": add_trace({}, entry, event="load_context", ticket_id=ticket_id,  # trace is per turn
+                           customer=customer.get("external_user_id"), identified=customer["identified"],
+                           ticket_status=ticket["status"], memories=len(recalled["memories"]),
+                           prior_tickets=len(recalled["prior_tickets"])),
     }
 
 
@@ -119,7 +123,8 @@ def finalize(state: dict) -> dict:
     return {
         "messages": [AIMessage(content=reply)],
         "ticket_status": status,
-        "trace": add_trace(state, f"[finalize] status={status}"),
+        "trace": add_trace(state, f"[finalize] status={status}", event="finalize", status=status,
+                           issue_type=issue_type, resolver=state.get("resolver")),
     }
 
 
@@ -216,7 +221,8 @@ def customer_messages_text(state: dict) -> str:
 def write_memory(state: dict) -> dict:
     customer = state.get("customer") or {}
     if not customer.get("identified"):
-        return {"trace": add_trace(state, "[memory] guest customer: nothing stored")}
+        return {"trace": add_trace(state, "[memory] guest customer: nothing stored", event="memory_write",
+                                   stored=[], dropped=[])}
     extractor = get_llm().with_structured_output(MemoryExtraction)
     result: MemoryExtraction = extractor.invoke([
         SystemMessage(content=MEMORY_PROMPT.format(
@@ -234,4 +240,4 @@ def write_memory(state: dict) -> dict:
     entry = f"[memory] stored {len(stored)} new memories: {stored}"
     if dropped:
         entry += f" | dropped: {dropped}"
-    return {"trace": add_trace(state, entry)}
+    return {"trace": add_trace(state, entry, event="memory_write", stored=stored, dropped=dropped)}

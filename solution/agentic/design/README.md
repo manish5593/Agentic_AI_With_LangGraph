@@ -189,6 +189,32 @@ Each decision with real consequences is enforced in code rather than left to a p
 These rules are covered by the offline tests in `tests/`. The demo results in the [root README](../../../README.md#demo-results)
 show them working against the real model.
 
+## Logging
+
+Every decision is recorded twice:
+- in the ticket's `trace`, a list of readable lines shown in the notebook;
+- in a structured event log, `logs/events.jsonl`, with one JSON object per line. The path can be changed with `UDAHUB_EVENT_LOG`, and the file is git-ignored.
+
+Each event has the same base fields: `ts`, `ticket_id`, `agent`, `event` and `message`. Each kind of event adds its own:
+
+| `event` | Logged by | Extra fields |
+|---|---|---|
+| `load_context` | memory | `customer`, `identified`, `ticket_status`, `memories`, `prior_tickets` |
+| `classify` | classifier | `issue_type`, `urgency`, `sentiment`, `requires_account_action`, `human_requested`, `language`, `confidence` |
+| `identify`, `route` | supervisor | `customer`; `route`, `reason` |
+| `retrieve` | knowledge_agent | `articles`: title and score |
+| `tools` | account_agent | `tools`: tool, args, success |
+| `assess`, `approve` | quality_gate | `confidence`, `grounded`, `answered_by_evidence`, `needs_human`, `awaiting_customer`, `reason` |
+| `escalate` | escalation_agent | `team`, `priority`, `reason` |
+| `request_info` | request_info | `asked`, `language` |
+| `finalize` | finalize | `status`, `issue_type`, `resolver` |
+| `memory_write` | memory | `stored`, `dropped` |
+| `error` | workflow | `error_type`, `error`, `traceback` |
+
+`agentic.event_log.search_events()` filters by any field. List fields match on any item, so
+`search_events(tools="request_refund")` finds every refund request. `text` searches the message and `since`
+limits the time range. The log also works with `jq` or `grep`, and loads straight into a dataframe.
+
 ## Inputs and outputs
 
 ### Input
@@ -234,6 +260,8 @@ messages only.
 | Request for a human, legal or safety issue, critical urgency (classified or reported in metadata) | Escalated straight away |
 | Blocked account with an account issue | Escalated to Trust & Safety, without revealing the reason for the block |
 | Ambiguous or off-topic message (classifier confidence < 0.5) | Escalated rather than guessed at |
+| Empty message | The customer is asked what they need, with no LLM call and no escalation |
+| Unknown account in the metadata, or the LLM unreachable | `process_ticket` catches the failure, logs it, flags the ticket for a human (`system_error`), and sends a fallback reply instead of crashing |
 | Message in another language | Classified with its language, and answered in that language. Even `request_info`'s fixed request for an email is translated; English speakers get the fixed text with no extra LLM call. |
 
 ### Output

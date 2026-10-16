@@ -19,4 +19,5 @@ def isolated_dbs(tmp_path, monkeypatch):
         copy = tmp_path / path.name
         shutil.copy(path, copy)
         monkeypatch.setattr(config, name, copy)
+    monkeypatch.setattr(config, "EVENT_LOG_PATH", tmp_path / "events.jsonl")
     yield

@@ -1,16 +1,17 @@
 """Helpers shared by the agents: tracing and prompt-context formatting."""
 import json
-import logging
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from agentic import config
+from agentic.event_log import log_event
 
-logger = logging.getLogger("udahub")
 
-
-def add_trace(state: dict, entry: str) -> list[str]:
-    logger.info(entry)
+def add_trace(state: dict, entry: str, event: str = "note", ticket_id=None, **fields) -> list[str]:
+    """Record one agent decision: in the ticket's `trace` (for display) and as a structured event in
+    the searchable event log. `entry` starts with the agent's name in brackets, e.g. "[supervisor] ..."."""
+    agent = entry[1:entry.index("]")] if entry.startswith("[") and "]" in entry else "workflow"
+    log_event(ticket_id or state.get("ticket_id"), agent, event, entry, **fields)
     return [*state.get("trace", []), entry]
 
 

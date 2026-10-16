@@ -74,12 +74,16 @@ def resolve_with_account_tools(state: dict) -> dict:
         return {
             "draft_response": None,
             "resolver": "account_agent",
-            "trace": add_trace(state, "[account_agent] gave up after too many steps"),
+            "trace": add_trace(state, "[account_agent] gave up after too many steps", event="tools", tools=[],
+                               error="recursion_limit"),
         }
     actions = _actions(result["messages"])
     return {
         "draft_response": result["messages"][-1].content,
         "actions_taken": actions,
         "resolver": "account_agent",
-        "trace": add_trace(state, f"[account_agent] tools used: {[a['tool'] for a in actions]}"),
+        "trace": add_trace(state, f"[account_agent] tools used: {[a['tool'] for a in actions]}", event="tools",
+                           tools=[{"tool": a["tool"], "args": a["args"],
+                                   "success": a["result"].get("success") if isinstance(a["result"], dict) else True}
+                                  for a in actions]),
     }

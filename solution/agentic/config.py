@@ -26,3 +26,6 @@ RAG_TOP_K = 3
 MAX_CONVERSATION_MESSAGES = 12
 MAX_PRIOR_TICKETS = 3
 MAX_MEMORIES = 10
+
+# Structured event log: one JSON object per agent decision (JSON Lines)
+EVENT_LOG_PATH = Path(os.getenv("UDAHUB_EVENT_LOG", STARTER_DIR / "logs" / "events.jsonl"))

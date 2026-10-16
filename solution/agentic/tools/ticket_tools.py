@@ -74,6 +74,11 @@ def get_or_create_ticket(ticket_id: str, metadata: Optional[dict] = None) -> dic
         return _ticket_info(ticket)
 
 
+def ticket_exists(ticket_id: str) -> bool:
+    with session_scope(udahub_engine()) as session:
+        return session.get(udahub.Ticket, ticket_id) is not None
+
+
 def link_ticket_to_customer(ticket_id: str, external_user_id: str, user_name: str) -> str:
     """Re-assign a guest ticket to an identified customer. Returns the udahub user id."""
     with session_scope(udahub_engine()) as session:

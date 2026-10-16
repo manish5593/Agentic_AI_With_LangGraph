@@ -127,6 +127,8 @@ python -m pytest tests
   - a reservation-state memory that is filtered out before it is stored
   - a memory writer that only sees the customer's messages
   - repeat issues, from a previous ticket and from the same ticket, that go straight to a human
+  - a structured, searchable event for every decision and tool call
+  - an LLM outage or unknown account that gets a fallback reply instead of a crash, and an empty message
 
 ## Folder guide
 
@@ -160,5 +162,7 @@ The project overview for the whole repository is in the [root README](../README.
 | Memory: state, short-term and long-term | `agentic/state.py`, `agentic/agents/memory_agent.py`, `agentic/tools/ticket_tools.py`, `CustomerMemory` in `data/models/udahub.py`. Notebook 03's "Persistent memory" cells show a returning customer's stored history, a fresh session (empty checkpointer) picking up a ticket from `udahub.db`, inspecting a ticket by `thread_id` (messages, tool usage, trace, node order), and a preference learned in one session and used in another (scenarios 12 and 13). |
 | At least 14 knowledge articles | `data/external/cultpass_articles.jsonl` (18 articles) |
 | Configuration and thresholds | `agentic/config.py` (overridable with env vars) |
+| Structured, searchable logs | `agentic/event_log.py`, documented in the design README's [Logging](agentic/design/README.md#logging) section, and searched in notebook 03 |
+| Error handling and edge cases | `process_ticket()` in `agentic/workflow.py`, and notebook 03's "Edge cases" cell |
 | Safeguards enforced in code | [`agentic/design/README.md`](agentic/design/README.md#safeguards-the-llm-proposes-code-decides) |
 | Demo run with outputs | `03_agentic_app.ipynb`, summarised under [Demo results](#demo-results-notebook-03) |

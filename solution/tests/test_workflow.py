@@ -248,3 +248,77 @@ def test_related_but_unhelpful_articles_are_escalated(run):
     assert state["ticket_status"] == "escalated"
     assert "don't answer" in state["escalation"]["reason"]
 
+
+
+def test_every_decision_is_logged_as_a_searchable_structured_event(run):
+    from agentic.event_log import search_events
+    graph = run(classification=classification(issue_type="login_access", summary="cannot log in"))
+    process_ticket("I forgot my password and can't log in", "t-log", agent=graph)
+
+    events = search_events(ticket_id="t-log")
+    assert [e["agent"] for e in events] == ["memory", "classifier", "supervisor", "knowledge_agent",
+                                           "quality_gate", "quality_gate", "finalize", "memory"]
+    assert all({"ts", "ticket_id", "agent", "event", "message"} <= e.keys() for e in events)
+    route = search_events(ticket_id="t-log", event="route")[0]
+    assert route["route"] == "knowledge_agent" and route["reason"]
+    retrieved = search_events(ticket_id="t-log", event="retrieve")[0]
+    assert retrieved["articles"][0]["title"] == "How to Handle Login Issues?"
+    assert search_events(articles="How to Handle Login Issues?")  # list fields are searchable too
+    assert search_events(ticket_id="t-log", event="finalize")[0]["status"] == "resolved"
+    assert search_events(text="route ->", ticket_id="t-log") == [route]
+
+
+def test_tool_usage_is_logged(run, monkeypatch):
+    graph = run(classification=classification(issue_type="billing_refund", requires_account_action=True))
+
+    def fake_agent(*args, tools, **kwargs):
+        refund = next(t for t in tools if t.name == "request_refund")
+
+        class _Agent:
+            def invoke(self, payload, config=None):
+                result = refund.invoke({"reason": "duplicate charge"})
+                call = {"id": "r1", "name": "request_refund", "args": {"reason": "duplicate charge"}}
+                return {"messages": [*payload["messages"], AIMessage(content="", tool_calls=[call]),
+                                     ToolMessage(content=json.dumps(result), tool_call_id="r1"),
+                                     AIMessage(content="Registered.")]}
+        return _Agent()
+    monkeypatch.setattr(account_agent, "create_react_agent", fake_agent)
+    process_ticket("I was charged twice", "t-log-tools", {"email": "bob.stone@granite.com"}, agent=graph)
+
+    from agentic.event_log import search_events
+    [tools] = search_events(ticket_id="t-log-tools", event="tools")
+    assert tools["tools"] == [{"tool": "request_refund", "args": {"reason": "duplicate charge"}, "success": True}]
+    assert search_events(tools="request_refund")[0]["ticket_id"] == "t-log-tools"
+    assert search_events(ticket_id="t-log-tools", event="escalate")[0]["team"] == "general_support"
+
+
+def test_a_failure_returns_a_fallback_reply_and_flags_the_ticket(run, monkeypatch):
+    from agentic.event_log import search_events
+    from agentic.workflow import FALLBACK_REPLY
+    graph = run()
+
+    def llm_down(*args, **kwargs):
+        raise ConnectionError("OpenAI is unreachable")
+    monkeypatch.setattr(classifier, "get_llm", llm_down)
+    state = process_ticket("What's included?", "t-fail", agent=graph)
+
+    assert state["final_response"] == FALLBACK_REPLY and state["ticket_status"] == "error"
+    info = ticket_tools.get_or_create_ticket("t-fail")
+    assert info["status"] == "escalated" and "system_error" in info["tags"]
+    [error] = search_events(ticket_id="t-fail", event="error")
+    assert error["error_type"] == "ConnectionError"
+
+
+def test_unknown_account_does_not_crash(run):
+    from agentic.event_log import search_events
+    state = process_ticket("Hi", "t-bad-account", {"account_id": "netflix"}, agent=run())
+    assert state["ticket_status"] == "error"
+    assert "Unknown account" in search_events(ticket_id="t-bad-account", event="error")[0]["error"]
+
+
+def test_empty_message_asks_what_the_customer_needs_without_the_llm(run):
+    from agentic.agents.supervisor import EMPTY_MESSAGE_REPLY
+    graph = run()
+    state = process_ticket("   ", "t-empty", agent=graph)
+    assert state["route"] == "request_info" and state["final_response"] == EMPTY_MESSAGE_REPLY
+    assert TicketClassification not in classifier.get_llm().prompts  # no classification call made
