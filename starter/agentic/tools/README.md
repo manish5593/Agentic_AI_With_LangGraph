@@ -1,7 +1,9 @@
 # Tools
 
 Each module provides plain Python functions, which hold the business rules and are unit-tested without an LLM.
-The tools the agents call are thin LangChain wrappers around them.
+The tools the agents call are thin LangChain wrappers around them. Because the rules live in the tools, they hold
+whatever the model decides. The [Safeguards](../design/README.md#safeguards-the-llm-proposes-code-decides) section
+of the design README lists them.
 
 ## `cultpass_tools.py`: CultPass account tools
 
@@ -28,8 +30,8 @@ by the supervisor and the memory nodes.
 ## `knowledge_tools.py`: RAG over the knowledge base
 
 - **Retriever:** `KnowledgeRetriever` indexes the account's `knowledge` articles in an `InMemoryVectorStore` with OpenAI embeddings (`text-embedding-3-small`).
-- **Search:** `search()` returns the top 3 articles scoring at least 0.30 cosine similarity.
-- **Fallback:** if embeddings are unavailable, it falls back to IDF keyword scoring with light stemming, so the tests run offline.
+- **Search:** `search()` returns the top 3 articles scoring at least 0.30 cosine similarity. The threshold can be changed with the `UDAHUB_RAG_MIN_SCORE` environment variable.
+- **Fallback:** if embeddings are unavailable, for example offline or without `numpy`, it falls back to IDF keyword scoring with light stemming and a 0.10 threshold. A warning is logged when this happens. The fallback also lets the tests run offline.
 - **Caching:** `get_retriever()` builds each account's index once.
 - **Tool:** `search_knowledge_base` gives the account agent access to the same retriever.
 
@@ -48,3 +50,13 @@ by the supervisor and the memory nodes.
 
 Cached SQLAlchemy engines and a session context manager for `udahub.db` and `cultpass.db`. The paths come from
 `agentic/config.py` and can be overridden with the `UDAHUB_DB_PATH` and `CULTPASS_DB_PATH` environment variables.
+
+## Adding a tool
+
+1. Write the logic as a plain function that takes ids and returns a dict, with `success` and an `error`
+   message on failure. Returning errors instead of raising lets the agent explain the problem or recover.
+2. Expose it to the account agent inside `build_account_tools()`. Take the customer's id from the closure,
+   not from the LLM, and give it a docstring: that's the description the model sees.
+3. If it should accept only ids the agent looked up, check them against `seen_reservation_ids` or
+   `seen_experience_ids`. If a successful call should always reach a human, add its name to `ESCALATING_TOOLS`.
+4. Add unit tests for its rules to `tests/test_tools.py`.
