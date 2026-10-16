@@ -23,6 +23,19 @@ LLM can never act on another customer's account. The tools are rebuilt on every 
 An id that wasn't looked up gets an error telling the agent which lookup to call. The error is returned rather
 than raised, so the agent can recover.
 
+### Error handling and validation
+
+Every tool returns structured data, and every failure comes back as `{"success": false, "error": "..."}`:
+
+| Kind of failure | How it's handled |
+|---|---|
+| Invalid arguments, such as an unknown subscription action or a missing id | Rejected by the tool's typed schema before it runs. LangGraph returns the validation message to the agent. |
+| Business rules: blocked account, full event, quota used, double booking, ownership, invalid state change | Checked by the underlying function and returned as an error |
+| Unusable input: an id that wasn't looked up this turn, a refund request with no reason | Checked by the tool wrapper and returned as an error |
+| Unexpected faults, such as the database being unavailable | Caught by `_safe()`, logged, and returned as an error. LangGraph's `ToolNode` only catches invalid-argument errors, so without this one fault would crash the whole run and leave the customer without a reply. |
+
+Notebook 03's "Support tools on sample operations" cell runs each tool on sample operations, including these failures.
+
 The underlying functions (`get_customer_profile`, `find_customer_by_email`, `list_reservations`,
 `search_experiences`, `reserve_experience`, `cancel_reservation`, `manage_subscription`) are also used directly
 by the supervisor and the memory nodes.

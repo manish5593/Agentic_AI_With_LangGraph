@@ -3,6 +3,8 @@
 Every action is scoped to a single customer: `build_account_tools` binds the
 customer id into the tools so the LLM can never act on someone else's account.
 """
+import functools
+import logging
 import uuid
 from datetime import datetime
 from typing import Literal, Optional
@@ -12,6 +14,8 @@ from langchain_core.tools import StructuredTool
 from agentic.tools.db import cultpass_engine, session_scope
 from agentic.tools import ticket_tools
 from data.models import cultpass
+
+logger = logging.getLogger(__name__)
 
 
 def _fmt_dt(value: Optional[datetime]) -> Optional[str]:
@@ -269,7 +273,10 @@ def build_account_tools(user_id: str, ticket_id: str) -> list[StructuredTool]:
         return manage_subscription(user_id, action)
 
     def request_refund(reason: str) -> dict:
-        """Register a refund request for support-lead approval. This does NOT issue a refund; the ticket will be escalated."""
+        """Register a refund request for support-lead approval. This does NOT issue a refund; the ticket will be escalated. `reason` must describe the problem, e.g. 'charged twice in October'."""
+        reason = reason.strip()
+        if len(reason) < 5:
+            return {"success": False, "error": "A refund request needs a reason describing the problem."}
         ref = f"RF-{uuid.uuid4().hex[:6].upper()}"
         ticket_tools.add_message(
             ticket_id, "system", f"Refund request {ref} pending support-lead approval. Reason: {reason}"
@@ -290,7 +297,25 @@ def build_account_tools(user_id: str, ticket_id: str) -> list[StructuredTool]:
         change_subscription,
         request_refund,
     ]
-    return [StructuredTool.from_function(f) for f in funcs]
+    return [StructuredTool.from_function(_safe(f)) for f in funcs]
+
+
+def _safe(func):
+    """Turn unexpected errors (e.g. the database being unavailable) into a structured error result.
+
+    LangGraph's ToolNode only catches invalid-argument errors; anything else would crash the whole
+    graph run and leave the customer without a reply. Business-rule failures are already returned
+    as data by the functions above, so this only fires on real faults.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.exception("Tool %s failed", func.__name__)
+            return {"success": False, "error": "Internal error while contacting the CultPass system. "
+                    "Don't retry; tell the customer the team will follow up."}
+    return wrapper
 
 
 # Tools whose successful use means policy requires a human to follow up

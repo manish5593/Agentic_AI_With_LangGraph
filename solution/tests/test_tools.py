@@ -224,3 +224,18 @@ def test_reported_urgency_can_raise_but_not_lower_the_routing_urgency():
     assert route == "escalation_agent" and "metadata" in reason
     # high reported urgency alone doesn't escalate
     assert route_ticket({**GOOD, "urgency": "low"}, KNOWN, "open", reported_urgency="high")[0] == "knowledge_agent"
+
+
+def test_tools_return_structured_errors_instead_of_raising(monkeypatch):
+    tools = {t.name: t for t in cp.build_account_tools(BOB, "t-1")}
+    # the schema the LLM sees is unchanged by the error wrapper
+    assert tools["change_subscription"].args["action"]["enum"] == ["pause", "resume", "cancel"]
+    assert "support-lead approval" in tools["request_refund"].description
+
+    assert tools["request_refund"].invoke({"reason": "  "})["success"] is False
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("database is locked")
+    monkeypatch.setattr(cp, "list_reservations", broken)
+    result = tools["get_my_reservations"].invoke({})
+    assert result["success"] is False and "Internal error" in result["error"]
