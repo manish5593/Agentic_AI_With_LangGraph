@@ -100,7 +100,7 @@ One graph run handles one customer message. Each node reads the shared state and
 | 3 | `supervisor` | `classification`, `customer`, `prior_tickets`, `ticket_status` | `route`, `route_reason`. A guest is linked to their account if the classifier found their email. |
 | 4a | `knowledge_agent` | `classification`, conversation, customer context | `knowledge` (retrieved articles), `draft_response` |
 | 4b | `account_agent` | conversation, customer context | `actions_taken` (every tool call and result), `draft_response` |
-| 4c | `request_info` | `classification` | `final_response` (asks for the customer's email) |
+| 4c | `request_info` | `classification` | `final_response` (asks for the customer's email, in their language) |
 | 5 | `quality_gate` | `draft_response`, `knowledge`, `actions_taken`, `prior_tickets` | `assessment`. Then `should_escalate()` picks `approve` or `escalation_agent`. |
 | 6 | `approve` or `escalation_agent` | the draft, or everything above | `final_response`. Escalation also writes `escalation` (team, priority, summary, steps taken) and saves a handoff note to the ticket. |
 | 7 | `finalize` | `final_response`, `route`, `escalation`, `assessment` | `messages` (the reply), `ticket_status`. It also saves the reply and the ticket's status, issue type and tags. |
@@ -225,7 +225,7 @@ messages only.
 | Request for a human, legal or safety issue, critical urgency | Escalated straight away |
 | Blocked account with an account issue | Escalated to Trust & Safety, without revealing the reason for the block |
 | Ambiguous or off-topic message (classifier confidence < 0.5) | Escalated rather than guessed at |
-| Message in another language | Classified with its language, and answered in that language. The one exception is `request_info`'s fixed request for an email, which is in English. |
+| Message in another language | Classified with its language, and answered in that language. Even `request_info`'s fixed request for an email is translated; English speakers get the fixed text with no extra LLM call. |
 
 ### Output
 

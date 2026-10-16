@@ -3,9 +3,12 @@
 Routing is deterministic and auditable: the LLM classifies, the supervisor applies
 business rules on top of that classification.
 """
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from agentic import config
 from agentic.agents.common import add_trace
 from agentic.agents.memory_agent import build_customer, recall
+from agentic.llm import get_llm
 from agentic.tools import cultpass_tools, ticket_tools
 
 ACCOUNT_ISSUES = {"reservation", "subscription", "billing_refund"}
@@ -82,12 +85,28 @@ REQUEST_INFO_MESSAGE = (
 )
 
 
+TRANSLATE_PROMPT = """Translate this customer support message into {language}.
+Keep the meaning, the friendly tone and any email address exactly as they are.
+Reply with the translated message only."""
+
+
+def _in_customer_language(message: str, language: str) -> str:
+    """Return the fixed message in the customer's language. English needs no LLM call."""
+    if not language or language.strip().lower() in {"english", "en"}:
+        return message
+    reply = get_llm().invoke([SystemMessage(content=TRANSLATE_PROMPT.format(language=language)),
+                              HumanMessage(content=message)])
+    return reply.content.strip() or message
+
+
 def request_info(state: dict) -> dict:
     """Ask the customer for the information needed to continue (keeps the ticket open)."""
-    email = (state.get("classification") or {}).get("customer_email")
+    classification = state.get("classification") or {}
+    email = classification.get("customer_email")
     message = REQUEST_INFO_MESSAGE
     if email:
         message = (f"I couldn't find a CultPass account registered with {email}. Could you double-check "
                    "the email address you use to log in to CultPass?")
-    return {"final_response": message,
-            "trace": add_trace(state, "[request_info] asked customer to identify themselves")}
+    language = classification.get("language", "English")
+    return {"final_response": _in_customer_language(message, language),
+            "trace": add_trace(state, f"[request_info] asked customer to identify themselves ({language})")}

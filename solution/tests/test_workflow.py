@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from agentic.agents import (account_agent, classifier, escalation_agent, knowledge_agent,
-                            memory_agent, quality_gate)
+                            memory_agent, quality_gate, supervisor)
 from agentic.agents.escalation_agent import EscalationHandoff
 from agentic.agents.memory_agent import Memory, MemoryExtraction
 from agentic.state import ResolutionAssessment, TicketClassification
@@ -66,7 +66,8 @@ def run(monkeypatch):
             EscalationHandoff: HANDOFF,
             MemoryExtraction: outputs.get("memories", MemoryExtraction(memories=[])),
         })
-        for module in (classifier, knowledge_agent, quality_gate, escalation_agent, memory_agent, account_agent):
+        for module in (classifier, knowledge_agent, quality_gate, escalation_agent, memory_agent, account_agent,
+                       supervisor):
             monkeypatch.setattr(module, "get_llm", lambda *a, **k: llm)
         return build_graph(MemorySaver())
     return configure
@@ -204,3 +205,18 @@ def test_repeat_issue_on_the_same_ticket_is_escalated(run):
     second = process_ticket("I reinstalled it and it still crashes", "t-same", agent=graph)
     assert second["route"] == "escalation_agent"
     assert "repeat technical" in second["route_reason"]
+
+
+def test_request_info_follows_the_customer_language(run):
+    from agentic.agents.supervisor import REQUEST_INFO_MESSAGE
+    graph = run(classification=classification(issue_type="reservation", requires_account_action=True))
+    english = process_ticket("Please cancel my reservation", "t-lang-en", agent=graph)
+    assert english["final_response"] == REQUEST_INFO_MESSAGE  # fixed text, no LLM call
+
+    supervisor.get_llm().outputs[TicketClassification] = classification(
+        issue_type="reservation", requires_account_action=True, language="Portuguese")
+    portuguese = process_ticket("Quero cancelar minha reserva", "t-lang-pt", agent=graph)
+    # FakeLLM.invoke stands in for the translation
+    assert portuguese["route"] == "request_info"
+    assert portuguese["final_response"] == "Tap 'Forgot Password' on the login screen."
+    assert "(Portuguese)" in portuguese["trace"][-3]
