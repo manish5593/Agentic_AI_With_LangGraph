@@ -121,6 +121,3 @@ Paths are relative to `solution/` (the same files exist in `starter/`).
 * [LangChain](https://python.langchain.com/) - Tools, vector store and model integrations
 * [OpenAI](https://platform.openai.com/) - `gpt-4o-mini` chat model and `text-embedding-3-small` embeddings
 * [SQLAlchemy](https://www.sqlalchemy.org/) - Core (`udahub.db`) and external (`cultpass.db`) databases
-
-## License
-[License](../LICENSE.md)
