@@ -12,7 +12,9 @@ Classify the customer's CURRENT request (the latest customer message, using earl
 
 Issue types:
 - login_access: cannot log in, password reset, verification emails
-- reservation: book, cancel, check or change reservations; QR codes; attendance
+- reservation: book, cancel, check or change reservations; find, recommend or check availability of
+  experiences; QR codes; attendance. Recommendations and availability need the real experience catalog,
+  so set requires_account_action=true for them.
 - subscription: plan details, tiers, quota, pause/cancel/resume subscription
 - billing_refund: charges, payment methods, invoices, refunds
 - account_blocked: the customer says the account is blocked/suspended/restricted

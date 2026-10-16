@@ -134,12 +134,20 @@ class MemoryExtraction(BaseModel):
 
 
 MEMORY_PROMPT = """You maintain long-term memory about a customer of a cultural-experiences subscription service.
-From the latest exchange, extract ONLY durable information useful in future support tickets:
-- preferences (language, contact channel, favourite kinds of experiences or cities, accessibility needs)
-- personal facts relevant to support (e.g. 'travels often to Rio', 'shares the account with partner')
-- important issue history (e.g. 'requested a refund for a duplicate charge in this ticket')
-Do NOT store secrets, passwords, payment data, or one-off details. Do not repeat known memories.
-Return an empty list when there is nothing new.
+From the conversation, extract ONLY durable information useful in future support tickets:
+- preference: something the customer said they like, dislike or prefer (language, contact channel,
+  kinds of experiences, cities, accessibility needs)
+- personal_fact: something the customer said about themselves that matters for support
+- issue_history: a significant problem the customer reported, such as a billing dispute or refund request
+Strict rules:
+- Every memory must be EXPLICITLY stated by the Customer in their own messages. Never infer, guess or
+  generalise (one booking in a city does NOT mean they travel there often), and never take facts from the
+  Assistant's replies or account data.
+- Do NOT store current account state that the system can look up and that goes stale: specific reservations,
+  bookings or cancellations, event dates, subscription status, quota or ticket status.
+- Do NOT store secrets, passwords, payment data, or routine requests (e.g. "asked to cancel a reservation").
+- Do not repeat known memories.
+Most conversations contain nothing worth remembering: return an empty list unless a rule clearly applies.
 
 Known memories:
 {known}
