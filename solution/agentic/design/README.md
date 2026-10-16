@@ -136,10 +136,13 @@ A blocked customer can still get answers to general questions, such as what a su
 Any of these triggers an escalation:
 
 - a policy-gated tool succeeded (`request_refund`: refunds require support-lead approval)
-- the gate says a human is needed
-- the draft is not grounded in the evidence
+- the gate says a human must take over now. Offering escalation only if the documented steps don't work doesn't count.
+- the draft is not grounded in the evidence: any fact, step or suggestion that no article or tool result supports
+- the evidence doesn't answer the question. For example, articles on a related topic were retrieved, but none
+  answers what was asked. A necessary clarifying question is exempt.
 - the gate's confidence is below `0.7`
-- the resolver produced no draft (no relevant article, or the agent hit its step limit)
+- the resolver produced no draft: no article scored above the 0.30 relevance threshold ("no relevant knowledge base
+  article found"), or the agent hit its step limit
 
 Thresholds are set in `agentic/config.py` and can be overridden with env vars.
 
@@ -177,7 +180,7 @@ Each decision with real consequences is enforced in code rather than left to a p
 | Promising a refund | Using `request_refund` always escalates, whatever the draft says | `should_escalate`, `ESCALATING_TOOLS` |
 | Answering a blocked account, legal issue or human request | Routing rules send these to escalation before any resolver runs | `route_ticket` |
 | Repeating a fix that already failed | A problem the customer reported before goes straight to a human | `route_ticket`, `repeat_issue_types` |
-| Sending a wrong or unsupported answer | The draft is escalated when it isn't backed by the evidence or confidence is below 0.7 | `should_escalate` |
+| Sending a wrong or unsupported answer | The draft is escalated when it isn't backed by the evidence, the evidence doesn't answer the question, no relevant article was found, or confidence is below 0.7 | `should_escalate`, `KnowledgeRetriever.search` |
 | Storing stale, invented or personal memories | The memory writer sees only the customer's messages. Filters drop reservation state, named experiences, one-off requests and contact details, and duplicates are skipped | `customer_messages_text`, `drop_reason`, `save_memory` |
 
 These rules are covered by the offline tests in `tests/`. The demo results in the [root README](../../../README.md#demo-results)

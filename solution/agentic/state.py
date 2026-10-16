@@ -51,9 +51,15 @@ class ResolutionAssessment(BaseModel):
     grounded: bool = Field(
         description="True if every factual claim is supported by the knowledge/tool context."
     )
+    answered_by_evidence: bool = Field(
+        description="True only if the knowledge base articles or tool results actually answer the customer's "
+        "question. False if they are merely related, or the draft has to send the customer elsewhere."
+    )
     needs_human: bool = Field(
-        description="True if policy requires a human (refund approval, blocked account, legal, "
-        "identity verification) or the draft cannot resolve the issue."
+        description="True only if a human must take over NOW: policy requires one (refund approval, blocked "
+        "account, legal, identity verification), the draft cannot resolve the issue, or documented steps "
+        "already failed. False when the draft gives the steps to try and only offers escalation if they "
+        "don't work."
     )
     awaiting_customer: bool = Field(
         description="True if the draft asks the customer a necessary clarifying question."

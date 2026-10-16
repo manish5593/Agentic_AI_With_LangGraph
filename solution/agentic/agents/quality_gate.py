@@ -13,10 +13,17 @@ from agentic.tools.knowledge_tools import format_articles
 GATE_PROMPT = """You review draft replies written by an AI support agent for CultPass before they are sent.
 Judge the draft against the evidence (knowledge base articles and tool results) only.
 - confidence: how sure you are that the draft correctly and fully addresses the customer's request.
-- grounded: false if the draft states facts, policies or account details not supported by the evidence.
+- grounded: false if the draft states facts, policies, steps or suggestions not supported by the evidence.
+  Advice such as "check the venue's website" or "look at the event details" is NOT grounded unless an
+  article says it.
+- answered_by_evidence: true only if the evidence actually answers what the customer asked. Articles that are
+  on a related topic but don't answer the question (e.g. an article about QR codes for a question about
+  parking) mean false. A draft that can't answer and offers to pass the question on also means false.
 - needs_human: true if policy requires a human (refund approval, blocked account, identity verification,
   legal/data-protection issues), if the draft says it cannot help, or if the issue is persistent
   after the documented steps were already tried (see conversation / previous tickets).
+  A draft that gives the documented steps and says the team can help *if they don't work* does NOT need a
+  human yet: the customer should try the steps first.
 - awaiting_customer: true if the draft asks a clarifying question that is genuinely needed to proceed.
   A good clarifying question is a valid outcome and deserves high confidence."""
 
@@ -24,8 +31,12 @@ Judge the draft against the evidence (knowledge base articles and tool results) 
 def assess_resolution(state: dict) -> dict:
     draft = state.get("draft_response")
     if not draft:
-        assessment = {"confidence": 0.0, "grounded": False, "needs_human": True,
-                      "awaiting_customer": False, "reason": "resolver could not produce an answer"}
+        if state.get("resolver") == "knowledge_agent":
+            reason = "no relevant knowledge base article found"
+        else:
+            reason = "resolver could not produce an answer"
+        assessment = {"confidence": 0.0, "grounded": False, "answered_by_evidence": False,
+                      "needs_human": True, "awaiting_customer": False, "reason": reason}
         return {"assessment": assessment,
                 "trace": add_trace(state, f"[quality_gate] {assessment['reason']}")}
 
@@ -59,6 +70,9 @@ def should_escalate(state: dict) -> tuple[bool, str]:
         return True, a.get("reason", "human required")
     if not a.get("grounded", False):
         return True, "draft is not grounded in the knowledge base or account data"
+    # A necessary clarifying question is a valid reply even though nothing is answered yet
+    if not a.get("answered_by_evidence", False) and not a.get("awaiting_customer"):
+        return True, "the knowledge base and account data don't answer this question"
     if a.get("confidence", 0) < config.RESOLUTION_MIN_CONFIDENCE:
         return True, f"resolution confidence {a.get('confidence', 0):.2f} below {config.RESOLUTION_MIN_CONFIDENCE}"
     return False, "draft approved"

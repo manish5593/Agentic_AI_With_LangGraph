@@ -73,7 +73,7 @@ cp .env.example .env          # then add your OPENAI_API_KEY (and OPENAI_BASE_UR
 
 Put your key in `.env`, which git ignores, and never in `.env.example`, which is committed.
 
-Both databases are committed, so you can open `03_agentic_app.ipynb` straight away. It runs 8 demo scenarios and
+Both databases are committed, so you can open `03_agentic_app.ipynb` straight away. It runs 11 demo scenarios and
 then an interactive chat. The other two notebooks rebuild the databases, so run them only to reset the data:
 the demos make real bookings and cancellations, and store tickets and memories.
 
@@ -120,7 +120,7 @@ The tests need no API key. Each one runs against a temporary copy of the databas
 
 ## Demo Results
 
-These are the results of running the 8 scenarios in `03_agentic_app.ipynb` against the real model (`gpt-4o-mini`
+These are the results of running the 11 scenarios in `03_agentic_app.ipynb` against the real model (`gpt-4o-mini`
 with `text-embedding-3-small` for retrieval). The executed notebook, with every decision trace and reply, is
 committed in `solution/`.
 
@@ -134,9 +134,13 @@ committed in `solution/`.
 | 6 | Bob still can't log in after a password reset | supervisor → escalation agent (repeat issue: his previous ticket was a login problem) | Escalated to technical support | Login issue recorded |
 | 7 | Bob asks for a recommendation | account agent: `find_experiences` | Suggested real upcoming Rio experiences that match his stored music and dance preference and his premium tier | None |
 | 8 | Cathy demands a real person | supervisor → escalation agent | Escalated immediately | None (one-off request) |
+| 9 | Guest says the app keeps crashing | knowledge agent (top article: App Crashes and Technical Problems, 0.55) | Answered with the article's steps; waits for the customer to try them | None (guest) |
+| 10 | Guest asks about a student discount | knowledge agent: no article above the 0.30 threshold | Escalated: "no relevant knowledge base article found" | None (guest) |
+| 11 | Guest asks about parking at venues | knowledge agent: only related articles (QR codes, 0.41) | Escalated: the quality gate found the articles don't answer the question | None (guest) |
 
 The safeguards each did their job during the run:
 
+- **Knowledge grounding:** a cell in the notebook shows the right article retrieved for six kinds of ticket, and none for questions the knowledge base doesn't cover. Scenarios 10 and 11 show the two ways a question without a supporting article is escalated, instead of being answered with advice the articles don't contain.
 - **Id guard:** in most of our runs of scenario 2, the agent first tried to cancel with an id it guessed. The tool refused it, and the agent looked the reservation up before cancelling. In other runs, including the committed one, the agent looked it up first. Either way the outcome is the same, and `test_account_tools_refuse_ids_not_looked_up` checks the guard directly.
 - **Policy escalation:** refunds and blocked accounts always reached a human, whatever the model drafted.
 - **Repeat issues:** in scenario 6 Bob's previous ticket was a login problem, so the supervisor escalated him straight away. This took the same route in 4 out of 4 runs.

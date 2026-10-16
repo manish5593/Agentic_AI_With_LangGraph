@@ -90,6 +90,9 @@ The demos make real changes: bookings and cancellations, plus new tickets and me
 | 6 | Bob still can't log in | supervisor → escalated to technical support as a repeat issue (his previous ticket was a login problem) | Login issue recorded |
 | 7 | Bob asks for a recommendation | account_agent → `find_experiences` → real Rio experiences matching his stored preference and premium tier | None |
 | 8 | Customer demands a human | Escalated immediately | None (one-off request) |
+| 9 | Guest says the app keeps crashing | knowledge_agent (App Crashes article, 0.55) → answered with its steps | None (guest) |
+| 10 | Guest asks about a student discount | knowledge_agent finds no article above 0.30 → escalated ("no relevant knowledge base article found") | None (guest) |
+| 11 | Guest asks about parking | knowledge_agent finds only related articles → quality gate: they don't answer it → escalated | None (guest) |
 
 In most of our runs of scenario 2, the agent first tried to cancel with a guessed id. The tool refused it, and
 the agent looked the reservation up before cancelling. In other runs, including the committed one, it looked the
@@ -149,7 +152,7 @@ The project overview for the whole repository is in the [root README](../README.
 | Multi-agent architecture with LangGraph | `agentic/workflow.py`, `agentic/agents/` |
 | Input handling (text and metadata) | `process_ticket()` in `agentic/workflow.py`, `load_context` in `agentic/agents/memory_agent.py` |
 | Classification and routing | `agentic/agents/classifier.py`, `agentic/agents/supervisor.py`. Notebook 03's "Routing decisions for sample tickets" cell shows every rule on 10 sample tickets. |
-| RAG over the knowledge base | `agentic/tools/knowledge_tools.py`, `agentic/agents/knowledge_agent.py` |
+| RAG over the knowledge base | `agentic/tools/knowledge_tools.py`, `agentic/agents/knowledge_agent.py`. Notebook 03 shows retrieval for six ticket types, and scenarios 9–11 show answering and both kinds of knowledge-gap escalation. |
 | Tools, including the internal refund tool | `agentic/tools/cultpass_tools.py` |
 | Resolve or escalate | `agentic/agents/quality_gate.py`, `agentic/agents/escalation_agent.py` |
 | Memory: state, short-term and long-term | `agentic/state.py`, `agentic/agents/memory_agent.py`, `agentic/tools/ticket_tools.py`, `CustomerMemory` in `data/models/udahub.py` |

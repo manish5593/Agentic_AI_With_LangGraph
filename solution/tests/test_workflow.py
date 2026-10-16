@@ -26,8 +26,8 @@ def classification(**kw):
     return TicketClassification(**{**base, **kw})
 
 
-GOOD_ASSESSMENT = ResolutionAssessment(confidence=0.9, grounded=True, needs_human=False,
-                                       awaiting_customer=False, reason="grounded answer")
+GOOD_ASSESSMENT = ResolutionAssessment(confidence=0.9, grounded=True, answered_by_evidence=True,
+                                       needs_human=False, awaiting_customer=False, reason="grounded answer")
 HANDOFF = EscalationHandoff(team="general_support", priority="medium", summary="needs a human",
                             steps_taken=["checked KB"], recommended_next_step="call customer",
                             customer_message="A specialist will follow up by email.")
@@ -86,7 +86,7 @@ def test_knowledge_question_is_resolved_with_rag(run):
 
 
 def test_low_confidence_resolution_is_escalated(run):
-    low = ResolutionAssessment(confidence=0.4, grounded=True, needs_human=False,
+    low = ResolutionAssessment(confidence=0.4, grounded=True, answered_by_evidence=True, needs_human=False,
                                awaiting_customer=False, reason="unsure")
     graph = run(classification=classification(issue_type="login_access"), assessment=low)
     state = process_ticket("I forgot my password", "t-low", agent=graph)
@@ -228,3 +228,23 @@ def test_critical_urgency_in_metadata_routes_to_a_human(run):
                            {"urgency": "critical", "channel": "phone"}, agent=graph)
     assert state["route"] == "escalation_agent"
     assert "reported in the ticket metadata" in state["route_reason"]
+
+
+def test_no_relevant_article_is_escalated(run):
+    graph = run(classification=classification(issue_type="general_info", summary="xyzzy quantum"))
+    state = process_ticket("xyzzy quantum flux", "t-no-kb", agent=graph)
+    assert state["knowledge"] == []
+    assert state["ticket_status"] == "escalated"
+    assert state["escalation"]["reason"] == "no relevant knowledge base article found"
+
+
+def test_related_but_unhelpful_articles_are_escalated(run):
+    off_topic = ResolutionAssessment(confidence=0.9, grounded=True, answered_by_evidence=False, needs_human=False,
+                                     awaiting_customer=False, reason="articles are about QR codes, not parking")
+    graph = run(classification=classification(issue_type="general_info", summary="parking at venues"),
+                assessment=off_topic)
+    state = process_ticket("Is there a QR code for venue parking?", "t-weak-kb", agent=graph)
+    assert state["knowledge"], "a related article was retrieved"
+    assert state["ticket_status"] == "escalated"
+    assert "don't answer" in state["escalation"]["reason"]
+

@@ -103,10 +103,16 @@ def test_routing_rules():
 
 
 def test_escalation_rules():
-    ok = {"confidence": 0.9, "grounded": True, "needs_human": False}
+    ok = {"confidence": 0.9, "grounded": True, "answered_by_evidence": True, "needs_human": False}
     assert should_escalate({"assessment": ok})[0] is False
     assert should_escalate({"assessment": {**ok, "confidence": 0.5}})[0] is True
     assert should_escalate({"assessment": {**ok, "grounded": False}})[0] is True
+    # related articles that don't answer the question
+    escalate, reason = should_escalate({"assessment": {**ok, "answered_by_evidence": False}})
+    assert escalate and "don't answer" in reason
+    # ...unless the draft is a clarifying question
+    clarifying = {**ok, "answered_by_evidence": False, "awaiting_customer": True}
+    assert should_escalate({"assessment": clarifying})[0] is False
     assert should_escalate({"assessment": {**ok, "needs_human": True}})[0] is True
     refund = [{"tool": "request_refund", "args": {}, "result": {"success": True}}]
     assert should_escalate({"assessment": ok, "actions_taken": refund})[0] is True
