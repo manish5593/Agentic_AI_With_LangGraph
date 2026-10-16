@@ -239,3 +239,10 @@ def test_tools_return_structured_errors_instead_of_raising(monkeypatch):
     monkeypatch.setattr(cp, "list_reservations", broken)
     result = tools["get_my_reservations"].invoke({})
     assert result["success"] is False and "Internal error" in result["error"]
+
+
+def test_experience_search_marks_what_the_customer_already_booked():
+    tools = {t.name: t for t in cp.build_account_tools(BOB, "t-1")}
+    results = {e["title"]: e["already_booked"] for e in tools["find_experiences"].invoke({})}
+    assert results["Samba Night at Lapa"] is True  # in Bob's seeded reservations
+    assert results["Modern Art at MASP"] is False

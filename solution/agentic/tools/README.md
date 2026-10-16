@@ -14,7 +14,7 @@ LLM can never act on another customer's account. The tools are rebuilt on every 
 |---|---|---|
 | `get_my_account` | Profile, blocked status, subscription, and quota used and remaining this month | |
 | `get_my_reservations` | The customer's reservations: id, status, experience and date | |
-| `find_experiences` | Upcoming experiences with free slots, by keyword and location | |
+| `find_experiences` | Upcoming experiences with free slots, by keyword and location. Each result says whether the customer has `already_booked` it, so they aren't recommended something they already have. | |
 | `book_experience` | Reserves an experience | The id must have come from `find_experiences` or `get_my_reservations` in this turn. The account must not be blocked and the subscription must be active. Premium experiences need the premium tier. There must be free slots and quota left. No double booking. |
 | `cancel_my_reservation` | Cancels a reservation and returns the credit if it's at least 24h before the event | The id must have come from `get_my_reservations` in this turn, or from a booking made in this turn. The reservation must belong to the customer and still be active. |
 | `change_subscription` | Pauses, resumes or cancels the subscription | Only valid state changes are allowed. Blocked accounts can't make changes. |

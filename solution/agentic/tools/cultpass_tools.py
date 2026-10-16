@@ -246,8 +246,11 @@ def build_account_tools(user_id: str, ticket_id: str) -> list[StructuredTool]:
         return reservations
 
     def find_experiences(query: str = "", location: str = "") -> list[dict]:
-        """Search upcoming experiences with free slots. `query` matches title/description keywords, `location` matches the city/state."""
+        """Search upcoming experiences with free slots. `query` matches title/description keywords, `location` matches the city/state. Each result says whether the customer has `already_booked` it."""
         experiences = search_experiences(query=query, location=location)
+        booked = {r["experience_id"] for r in list_reservations(user_id) if r["status"] == "reserved"}
+        for exp in experiences:
+            exp["already_booked"] = exp["experience_id"] in booked
         seen_experience_ids.update(e["experience_id"] for e in experiences)
         return experiences
 
