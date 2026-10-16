@@ -170,3 +170,37 @@ def test_duplicate_memories_ignore_case_and_punctuation():
         assert tt.save_memory("cultpass", uid, "preference", variant, "t-dup") is False, variant
     assert tt.save_memory("cultpass", uid, "preference", "Enjoys jazz in Sao Paulo", "t-dup") is True
     assert sum("music and dance" in m["content"] for m in tt.get_memories(uid)) == 1
+
+
+def test_repeat_issues_escalate_but_routine_requests_do_not():
+    from agentic.agents.supervisor import repeat_issue_types
+    login = {**GOOD, "issue_type": "login_access"}
+    assert route_ticket(login, KNOWN, "open", frozenset({"login_access"}))[0] == "escalation_agent"
+    assert route_ticket(login, KNOWN, "open", frozenset({"billing_refund"}))[0] == "knowledge_agent"
+    # booking again is normal, not a failed fix
+    booking = {**GOOD, "issue_type": "reservation", "requires_account_action": True}
+    assert route_ticket(booking, KNOWN, "open", frozenset({"reservation"}))[0] == "account_agent"
+
+    prior = [{"issue_type": "login_access"}, {"issue_type": None}]
+    assert repeat_issue_types({"prior_tickets": prior}) == {"login_access"}
+    # an earlier answer on this ticket counts only if the ticket was marked resolved
+    assert repeat_issue_types({"ticket_status": "resolved", "ticket_issue_type": "technical"}) == {"technical"}
+    assert repeat_issue_types({"ticket_status": "awaiting_customer", "ticket_issue_type": "technical"}) == set()
+
+
+def test_memory_filter_drops_contact_details():
+    from agentic.agents.memory_agent import Memory, drop_reason
+    for text in ["The customer's email is bob.stone@granite.com.", "Phone number is +55 11 91234-5678"]:
+        assert drop_reason(Memory(category="personal_fact", content=text)) == "contact details", text
+    # a preference about how to be contacted is a real preference, not a contact detail
+    assert drop_reason(Memory(category="preference", content="Prefers to be contacted by email")) is None
+    assert drop_reason(Memory(category="issue_history", content="Reported being charged twice in 2026")) is None
+
+
+def test_memory_filter_drops_specific_experiences():
+    from agentic.agents.memory_agent import Memory, drop_reason
+    for memory in [Memory(category="personal_fact", content="The customer is interested in Samba Night at Lapa events."),
+                   Memory(category="preference", content="Wants to see the Modern Art at MASP tour")]:
+        assert drop_reason(memory) == "account state", memory.content
+    # a general taste is still a preference
+    assert drop_reason(Memory(category="preference", content="Enjoys samba and live music")) is None

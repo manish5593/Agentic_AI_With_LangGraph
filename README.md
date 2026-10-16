@@ -107,7 +107,8 @@ The tests need no API key. Each one runs against a temporary copy of the databas
   - CultPass tool business rules: blocked accounts, inactive subscriptions, double booking, ownership checks, quota and subscription state transitions
   - account tools that are bound to one customer, and that refuse reservation or experience ids not looked up in the same turn
   - ticket creation and linking, metadata and long-term memory
-  - the memory filters, which drop reservation state and one-off requests, and the duplicate check, which ignores case and punctuation
+  - the memory filters, which drop reservation state, named experiences, one-off requests and contact details, and the duplicate check, which ignores case and punctuation
+  - the repeat-issue rule, which escalates repeated problems but not routine requests
   - keyword retrieval quality
   - every routing rule and escalation rule
 - `tests/test_workflow.py` runs the whole LangGraph workflow end to end with a scripted fake LLM:
@@ -117,6 +118,8 @@ The tests need no API key. Each one runs against a temporary copy of the databas
   - a multi-turn guest who is identified by email, with short-term and long-term memory recall
   - a refund request that forces escalation and stores a new memory
   - a memory about reservation state that is filtered out before it reaches the database
+  - a memory writer that only sees the customer's messages, never the assistant's replies
+  - a repeat issue, from a previous ticket and from earlier on the same ticket, that goes straight to a human
 
 ## Demo Results
 
@@ -131,7 +134,7 @@ committed in both `starter/` and `solution/`.
 | 3 | Guest asks to book Samba Night, then gives their email | request_info → customer identified → account agent: `find_experiences`, `book_experience` | Resolved. Bob already had that booking, and the tool refused a duplicate | None (no duplicate of his stored preference) |
 | 4 | Alice, whose account is blocked, can't log in | supervisor → escalation agent | Escalated to Trust & Safety (high priority) without revealing the reason for the block | Login issue recorded |
 | 5 | Frank was charged twice | account agent: `request_refund` | Escalated to billing for support-lead approval, with no refund amount or timeline promised | Double charge and refund request recorded |
-| 6 | Bob still can't log in after a password reset | knowledge agent → quality gate wants a human | Escalated to technical support | Login issue recorded |
+| 6 | Bob still can't log in after a password reset | supervisor → escalation agent (repeat issue: his previous ticket was a login problem) | Escalated to technical support | Login issue recorded |
 | 7 | Bob asks for a recommendation | account agent: `find_experiences` | Suggested real upcoming Rio experiences that match his stored music and dance preference and his premium tier | None |
 | 8 | Cathy demands a real person | supervisor → escalation agent | Escalated immediately | None (one-off request) |
 
@@ -139,7 +142,8 @@ The safeguards each did their job during the run:
 
 - **Id guard:** in scenario 2 the agent first tried to cancel with an id it guessed. The tool refused it, and the agent looked the reservation up before cancelling.
 - **Policy escalation:** refunds and blocked accounts always reached a human, whatever the model drafted.
-- **Memory hygiene:** memories are stored as third-person summaries of what the customer reported. Reservation state, one-off requests and duplicates are not stored.
+- **Repeat issues:** in scenario 6 Bob's previous ticket was a login problem, so the supervisor escalated him straight away. This took the same route in 4 out of 4 runs.
+- **Memory hygiene:** memories are third-person summaries of what the customer wrote, never the assistant's replies. Reservation state, named experiences, one-off requests, contact details and duplicates are not stored.
 
 The model's wording varies from run to run, but the routes and outcomes above were the same across repeated runs.
 

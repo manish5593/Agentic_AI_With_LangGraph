@@ -26,7 +26,7 @@ graph TD
     SU -->|how-to / policy| KA[knowledge_agent<br/>RAG over KB]
     SU -->|needs account data/action| AA[account_agent<br/>ReAct + CultPass tools]
     SU -->|guest needs account action| RI[request_info<br/>ask for email]
-    SU -->|human requested / critical /<br/>blocked / low confidence| EA[escalation_agent<br/>handoff note]
+    SU -->|human requested / critical / blocked /<br/>repeat issue / low confidence| EA[escalation_agent<br/>handoff note]
     KA --> QG{quality_gate<br/>confidence & grounding}
     AA --> QG
     QG -->|approved| AP[approve]
@@ -72,9 +72,13 @@ The rules are evaluated in order:
 4. Classifier confidence < `0.5` → **escalation**
 5. Blocked customer whose issue involves their account: login, reservations, subscription, billing, a complaint, or any account action → **escalation** (Trust & Safety policy)
 6. Identified customer reports a blocked account → **escalation**
-7. Account data or action needed, customer unknown → **request_info**
-8. Account data or action needed (`reservation`, `subscription`, `billing_refund`, or `requires_account_action`) → **account_agent**. This includes recommendations.
-9. Otherwise → **knowledge_agent**
+7. Repeat problem: the customer reported the same issue type in a previous ticket, or this ticket was already
+   resolved for it and they wrote again. Applies to login, technical, billing/refund, privacy and complaint issues
+   → **escalation** (the documented fix didn't work). Reservations and subscription changes are routine and
+   expected to repeat, so they're excluded.
+8. Account data or action needed, customer unknown → **request_info**
+9. Account data or action needed (`reservation`, `subscription`, `billing_refund`, or `requires_account_action`) → **account_agent**. This includes recommendations.
+10. Otherwise → **knowledge_agent**
 
 A blocked customer can still get answers to general questions, such as what a subscription includes.
 
@@ -123,8 +127,9 @@ Each decision with real consequences is enforced in code rather than left to a p
 | Breaking business rules | Blocked accounts, subscription status, tier, slots, quota and double booking are checked before every change | `reserve_experience`, `manage_subscription` |
 | Promising a refund | Using `request_refund` always escalates, whatever the draft says | `should_escalate`, `ESCALATING_TOOLS` |
 | Answering a blocked account, legal issue or human request | Routing rules send these to escalation before any resolver runs | `route_ticket` |
+| Repeating a fix that already failed | A problem the customer reported before goes straight to a human | `route_ticket`, `repeat_issue_types` |
 | Sending a wrong or unsupported answer | The draft is escalated when it isn't backed by the evidence or confidence is below 0.7 | `should_escalate` |
-| Storing stale or invented memories | Filters drop reservation state and one-off requests, and duplicates are skipped | `drop_reason`, `save_memory` |
+| Storing stale, invented or personal memories | The memory writer sees only the customer's messages. Filters drop reservation state, named experiences, one-off requests and contact details, and duplicates are skipped | `customer_messages_text`, `drop_reason`, `save_memory` |
 
 These rules are covered by the offline tests in `tests/`. The demo results in the [root README](../../../README.md#demo-results)
 show them working against the real model.

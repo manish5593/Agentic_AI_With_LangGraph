@@ -40,7 +40,7 @@ read each scenario's decision trace and reply without running it. Re-running it 
 | 3 | Guest asks to book, then gives their email | Customer identified; the agent finds the booking already exists |
 | 4 | Blocked customer can't log in | Escalated to Trust & Safety |
 | 5 | Customer charged twice | Refund request registered and escalated to billing |
-| 6 | Login still failing after a reset | Escalated to technical support |
+| 6 | Login still failing after a reset | Escalated straight to technical support as a repeat issue |
 | 7 | Customer asks for a recommendation | Real catalog experiences matching their stored preference |
 | 8 | Customer demands a human | Escalated immediately |
 

@@ -81,6 +81,7 @@ class UdaHubState(TypedDict, total=False):
     metadata: dict  # e.g. {"account_id", "external_user_id", "email", "channel", "urgency"}
     channel: str
     ticket_status: str
+    ticket_issue_type: Optional[str]  # main issue type recorded on the ticket by earlier turns
 
     # Context loaded from long-term memory
     customer: CustomerContext

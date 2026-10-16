@@ -55,7 +55,7 @@
 <text x="1020.0" y="439.0" class="t">request_info</text>
 <text x="1020.0" y="457.0" class="s">ask guest for email</text>
 <text x="1020.0" y="473.0" class="s">then continue thread</text>
-<text x="790" y="372" class="l" text-anchor="middle">human asked · critical · blocked · low confidence</text>
+<text x="790" y="372" class="l" text-anchor="middle">human asked · critical · blocked · repeat · low confidence</text>
 <path d="M240 485 V530 H308" fill="none" stroke="#4a5568" stroke-width="1.6" marker-end="url(#arrow)"/>
 <path d="M500 485 V518 H432" fill="none" stroke="#4a5568" stroke-width="1.6" marker-end="url(#arrow)"/>
 <rect x="310" y="505" width="120" height="50" rx="10" fill="#efeafe" stroke="#6d4fd8" stroke-width="1.6"/>

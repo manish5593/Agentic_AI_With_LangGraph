@@ -38,6 +38,7 @@ class FakeLLM:
 
     def __init__(self, outputs):
         self.outputs = outputs  # {schema class: instance}
+        self.prompts = {}  # {schema class: messages of the last call}
 
     def invoke(self, messages):
         return AIMessage(content="Tap 'Forgot Password' on the login screen.")
@@ -47,6 +48,7 @@ class FakeLLM:
 
         class _Runner:
             def invoke(self, messages):
+                fake.prompts[schema] = messages
                 return fake.outputs[schema]
         return _Runner()
 
@@ -173,3 +175,32 @@ def test_account_state_memories_are_not_stored(run):
     assert "Prefers replies in Portuguese" in stored
     assert not any("Samba" in m for m in stored)
     assert "(account state)" in state["trace"][-1]
+
+
+def test_memory_writer_only_sees_customer_messages(run):
+    graph = run(classification=classification(issue_type="login_access"))
+    process_ticket("I forgot my password", "t-only-customer", {"email": "bob.stone@granite.com"}, agent=graph)
+
+    prompt = memory_agent.get_llm().prompts[MemoryExtraction][0].content
+    assert "I forgot my password" in prompt
+    # the assistant's reply (scripted by FakeLLM) must not be visible to the memory writer
+    assert "Forgot Password" not in prompt
+
+
+def test_repeat_issue_from_a_previous_ticket_is_escalated(run):
+    # Bob's seeded past ticket (past-bob-login) was a login issue
+    graph = run(classification=classification(issue_type="login_access", summary="still cannot log in"))
+    state = process_ticket("I still can't log in", "t-repeat", {"email": "bob.stone@granite.com"}, agent=graph)
+    assert state["route"] == "escalation_agent"
+    assert "repeat login_access" in state["route_reason"]
+    assert state["ticket_status"] == "escalated"
+
+
+def test_repeat_issue_on_the_same_ticket_is_escalated(run):
+    graph = run(classification=classification(issue_type="technical", summary="app crashes"))
+    first = process_ticket("The app crashes when I open it", "t-same", agent=graph)
+    assert first["route"] == "knowledge_agent" and first["ticket_status"] == "resolved"
+
+    second = process_ticket("I reinstalled it and it still crashes", "t-same", agent=graph)
+    assert second["route"] == "escalation_agent"
+    assert "repeat technical" in second["route_reason"]

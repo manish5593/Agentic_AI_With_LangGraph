@@ -19,7 +19,7 @@ flowchart TD
     CL --> SU{supervisor}
     SU -.->|how-to / policy| KA[knowledge_agent<br/>RAG]
     SU -.->|account data / action| AA[account_agent<br/>tools]
-    SU -.->|human / critical / blocked| EA[escalation_agent]
+    SU -.->|human / critical / blocked / repeat| EA[escalation_agent]
     SU -.->|guest, needs account| RI[request_info]
     KA --> QG{quality_gate}
     AA --> QG
@@ -87,7 +87,7 @@ The demos make real changes: bookings and cancellations, plus new tickets and me
 | 3 | Guest asks to book Samba Night, then gives their email | request_info → Bob identified → account_agent finds he already has that booking | None (no duplicate preference) |
 | 4 | Alice (blocked account) can't log in | supervisor → escalated to Trust & Safety without revealing the reason for the block | Login issue recorded |
 | 5 | Frank was charged twice | account_agent → `request_refund` → escalated to billing for support-lead approval | Refund request recorded |
-| 6 | Bob still can't log in | knowledge_agent → quality gate wants a human → escalated to technical support | Login issue recorded |
+| 6 | Bob still can't log in | supervisor → escalated to technical support as a repeat issue (his previous ticket was a login problem) | Login issue recorded |
 | 7 | Bob asks for a recommendation | account_agent → `find_experiences` → real Rio experiences matching his stored preference and premium tier | None |
 | 8 | Customer demands a human | Escalated immediately | None (one-off request) |
 
@@ -107,7 +107,8 @@ python -m pytest tests
   - the tool business rules: blocked accounts, inactive subscriptions, double booking, ownership, quota and subscription transitions
   - account tools bound to one customer, which refuse ids that weren't looked up in the same turn
   - ticket and memory persistence
-  - the memory filters (reservation state, one-off requests) and the duplicate check
+  - the memory filters (reservation state, named experiences, one-off requests, contact details) and the duplicate check
+  - the repeat-issue rule, which escalates repeated problems but not routine requests
   - keyword retrieval
   - every routing and escalation rule
 - `tests/test_workflow.py` runs the whole graph end to end through these paths:
@@ -117,6 +118,8 @@ python -m pytest tests
   - multi-turn identification, recalling both short-term and long-term memory
   - a refund request that forces escalation and writes a new memory
   - a reservation-state memory that is filtered out before it is stored
+  - a memory writer that only sees the customer's messages
+  - repeat issues, from a previous ticket and from the same ticket, that go straight to a human
 
 ## Folder guide
 

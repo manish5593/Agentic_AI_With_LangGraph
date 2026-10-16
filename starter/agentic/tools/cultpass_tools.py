@@ -101,6 +101,12 @@ def list_reservations(user_id: str) -> list[dict]:
         ]
 
 
+def experience_titles() -> list[str]:
+    """Titles of every experience in the catalog, past and upcoming."""
+    with session_scope(cultpass_engine()) as session:
+        return [title for (title,) in session.query(cultpass.Experience.title).all()]
+
+
 def search_experiences(query: str = "", location: str = "", only_available: bool = True) -> list[dict]:
     with session_scope(cultpass_engine()) as session:
         q = session.query(cultpass.Experience).filter(cultpass.Experience.when >= datetime.now())

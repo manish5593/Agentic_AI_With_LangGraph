@@ -10,9 +10,22 @@ from agentic.tools import cultpass_tools, ticket_tools
 
 ACCOUNT_ISSUES = {"reservation", "subscription", "billing_refund"}
 BLOCKED_SENSITIVE_ISSUES = {"login_access", "reservation", "subscription", "billing_refund", "account_blocked", "complaint"}
+# Problems that should reach a human when they come back: the documented fix didn't work.
+# Routine requests (reservations, subscription changes, questions) are expected to repeat.
+REPEAT_ESCALATION_ISSUES = {"login_access", "technical", "billing_refund", "account_privacy", "complaint"}
 
 
-def route_ticket(classification: dict, customer: dict, ticket_status: str) -> tuple[str, str]:
+def repeat_issue_types(state: dict) -> set[str]:
+    """Issue types this customer already reported: in previous tickets, or earlier on this ticket
+    when it was marked resolved (the customer writing again means the answer didn't fix it)."""
+    types = {t["issue_type"] for t in state.get("prior_tickets") or [] if t.get("issue_type")}
+    if state.get("ticket_status") == "resolved" and state.get("ticket_issue_type"):
+        types.add(state["ticket_issue_type"])
+    return types
+
+
+def route_ticket(classification: dict, customer: dict, ticket_status: str,
+                 repeat_issues: frozenset = frozenset()) -> tuple[str, str]:
     """Return (route, reason). Pure function so the decision logic is easy to test."""
     c = classification
     if ticket_status == "escalated":
@@ -29,6 +42,8 @@ def route_ticket(classification: dict, customer: dict, ticket_status: str) -> tu
         return "escalation_agent", "account is blocked: policy requires Trust & Safety review"
     if c.get("issue_type") == "account_blocked" and customer.get("identified"):
         return "escalation_agent", "customer reports a blocked account"
+    if c.get("issue_type") in REPEAT_ESCALATION_ISSUES and c.get("issue_type") in repeat_issues:
+        return "escalation_agent", f"repeat {c.get('issue_type')} issue: the customer reported it before"
     needs_account = c.get("requires_account_action") or c.get("issue_type") in ACCOUNT_ISSUES
     if needs_account and not customer.get("identified"):
         return "request_info", "account action needed but customer is not identified"
@@ -54,7 +69,8 @@ def supervise(state: dict) -> dict:
         else:
             state = {**state, "trace": add_trace(state, f"[supervisor] no customer found for {email}")}
 
-    route, reason = route_ticket(state["classification"], customer, state.get("ticket_status", "open"))
+    route, reason = route_ticket(state["classification"], customer, state.get("ticket_status", "open"),
+                                 frozenset(repeat_issue_types({**state, **update})))
     update.update(route=route, route_reason=reason,
                   trace=add_trace(state, f"[supervisor] route -> {route}: {reason}"))
     return update
