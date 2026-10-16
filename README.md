@@ -9,11 +9,14 @@ A ticket in natural language, plus optional metadata (customer, channel, urgency
 - **Classifier**: issue type, urgency, sentiment, language and confidence
 - **Supervisor**: identifies the customer and routes the ticket with auditable rules
 - **Knowledge agent**: answers from the knowledge base with RAG
-- **Account agent**: uses CultPass tools (reservations, subscription, refund requests) scoped to the customer
+- **Account agent**: uses CultPass tools (reservations, subscription, refund requests) scoped to the customer, which only accept ids it looked up
 - **Quality gate**: approves the answer or escalates it, based on confidence, grounding and policy
 - **Escalation agent**: hands off to the right human team with a summary
-- **Memory**: short-term (the session's conversation, via the checkpointer) and long-term (preferences and
-  past tickets, in `udahub.db`)
+- **Memory**: short-term (the session's conversation, via the checkpointer) and long-term (preferences,
+  reported issues and past tickets, in `udahub.db`), with filters that keep stale and one-off facts out
+
+Business rules and policies are enforced in code, not left to prompts: the LLM proposes, and code decides. See
+[Safeguards](solution/agentic/design/README.md#safeguards-the-llm-proposes-code-decides).
 
 ![UDA-Hub architecture](solution/agentic/design/architecture.svg)
 
@@ -25,31 +28,42 @@ A ticket in natural language, plus optional metadata (customer, channel, urgency
 | `solution/` | A self-contained copy of the working project for reviewers, with its own guide in [`solution/README.md`](solution/README.md) |
 | `requirements.txt` | Python dependencies shared by both folders |
 
-The two folders hold the same code, and each runs on its own: paths are resolved relative to the folder.
-The architecture, routing rules and memory design are described in
-[`solution/agentic/design/README.md`](solution/agentic/design/README.md).
+The two folders hold the same code, data and executed notebooks, and each runs on its own: paths are resolved
+relative to the folder.
 
 ```
 <starter|solution>/
-├── 01_external_db_setup.ipynb   # builds data/external/cultpass.db
-├── 02_core_db_setup.ipynb       # builds data/core/udahub.db
-├── 03_agentic_app.ipynb         # demo scenarios and interactive chat
+├── 01_external_db_setup.ipynb   # rebuilds data/external/cultpass.db
+├── 02_core_db_setup.ipynb       # rebuilds data/core/udahub.db
+├── 03_agentic_app.ipynb         # demo scenarios (committed with outputs) and interactive chat
 ├── agentic/
 │   ├── workflow.py              # LangGraph graph: `orchestrator`, `process_ticket()`
 │   ├── agents/                  # classifier, supervisor, resolvers, quality gate, escalation, memory
 │   ├── tools/                   # CultPass tools, RAG retriever, ticket and memory storage
-│   ├── design/README.md         # architecture
+│   ├── design/                  # architecture diagram, Mermaid graph and design document
 │   ├── config.py                # models, paths and thresholds
 │   └── state.py                 # graph state and structured-output schemas
 ├── data/                        # SQLAlchemy models, JSONL seed data and the SQLite databases
 └── tests/                       # offline unit and end-to-end tests
 ```
 
+### Documentation
+
+| README | What it covers |
+|---|---|
+| [`solution/README.md`](solution/README.md) | Guide for reviewers: ticket flow, demo results, and where each requirement is met |
+| [`agentic/design/`](solution/agentic/design/README.md) | Architecture, routing rules, resolve-or-escalate logic, memory, and safeguards |
+| [`agentic/agents/`](solution/agentic/agents/README.md) | Each agent node, the long-term memory rules, and how to add an agent |
+| [`agentic/tools/`](solution/agentic/tools/README.md) | Each tool and the rules it enforces, retrieval, and how to add a tool |
+| [`data/core/`](solution/data/core/README.md) | `udahub.db`: tables, committed contents, and how the agents write to it |
+| [`data/external/`](solution/data/external/README.md) | `cultpass.db`: demo customers, resetting, and adding data |
+| [`starter/README.md`](starter/README.md) | Quick start for the workspace |
+
 ## Getting Started
 
 ### Dependencies
 
-Python 3.11+ and an OpenAI API key. Python packages are listed in `requirements.txt`: LangGraph, LangChain, langchain-openai, SQLAlchemy, python-dotenv and pytest.
+Python 3.11+ and an OpenAI API key. Python packages are listed in `requirements.txt`: LangGraph, LangChain, langchain-openai, NumPy (needed for embedding search), SQLAlchemy, python-dotenv and pytest.
 
 ### Installation
 
@@ -60,14 +74,14 @@ cd solution                   # or starter
 cp .env.example .env          # then add your OPENAI_API_KEY (and OPENAI_BASE_URL if using Vocareum)
 ```
 
-Then run the notebooks in order:
+Put your key in `.env`, which git ignores, and never in `.env.example`, which is committed.
 
-1. `01_external_db_setup.ipynb` creates `data/external/cultpass.db` (customers, subscriptions, experiences, reservations)
-2. `02_core_db_setup.ipynb` creates `data/core/udahub.db` (account, 18 knowledge articles, tickets, demo history and memory)
-3. `03_agentic_app.ipynb` runs 8 demo scenarios and an interactive chat
+Both databases are committed, so you can open `03_agentic_app.ipynb` straight away. It runs 8 demo scenarios and
+then an interactive chat. The other two notebooks rebuild the databases, so run them only to reset the data:
+the demos make real bookings and cancellations, and store tickets and memories.
 
-Both databases are committed, so steps 1 and 2 are only needed to reset the data. The demos make real
-bookings and cancellations, so re-run them after the demos to start fresh.
+1. `01_external_db_setup.ipynb` rebuilds `data/external/cultpass.db` (customers, subscriptions, experiences, reservations)
+2. `02_core_db_setup.ipynb` rebuilds `data/core/udahub.db` (account, 18 knowledge articles, tickets, demo history and memory)
 
 Programmatic use (from `solution/` or `starter/`):
 
@@ -142,7 +156,8 @@ Paths are relative to `solution/` (the same files exist in `starter/`).
 | Tools (incl. internal refund tool) | `agentic/tools/` |
 | Memory (state, short-term, long-term) | `memory_agent.py`, `ticket_tools.py`, `CustomerMemory` model |
 | Knowledge base (≥ 14 articles) | `data/external/cultpass_articles.jsonl` (18) |
-| Demo | `03_agentic_app.ipynb` |
+| Demo (committed with outputs) | `03_agentic_app.ipynb` |
+| Safeguards enforced in code | `agentic/design/README.md#safeguards-the-llm-proposes-code-decides` |
 
 ## Built With
 
@@ -150,3 +165,4 @@ Paths are relative to `solution/` (the same files exist in `starter/`).
 * [LangChain](https://python.langchain.com/) - Tools, vector store and model integrations
 * [OpenAI](https://platform.openai.com/) - `gpt-4o-mini` chat model and `text-embedding-3-small` embeddings
 * [SQLAlchemy](https://www.sqlalchemy.org/) - Core (`udahub.db`) and external (`cultpass.db`) databases
+* [NumPy](https://numpy.org/) - Cosine similarity for embedding search
