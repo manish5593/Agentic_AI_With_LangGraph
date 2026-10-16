@@ -128,3 +128,26 @@ def test_memory_filter_drops_account_state():
     ]
     assert all(is_account_state(m) for m in stale)
     assert not any(is_account_state(m) for m in kept)
+
+
+def test_account_tools_refuse_ids_not_looked_up():
+    tools = {t.name: t for t in cp.build_account_tools(BOB, "t-1")}
+    reservation_id = cp.list_reservations(BOB)[0]["reservation_id"]
+    experience_id = cp.search_experiences()[-1]["experience_id"]
+
+    # Real ids, but this turn hasn't looked them up yet
+    assert "get_my_reservations first" in tools["cancel_my_reservation"].invoke({"reservation_id": reservation_id})["error"]
+    assert "find_experiences first" in tools["book_experience"].invoke({"experience_id": experience_id})["error"]
+
+    tools["find_experiences"].invoke({})
+    booked = tools["book_experience"].invoke({"experience_id": experience_id})
+    assert booked["success"], booked
+    # a reservation the agent just made can be cancelled without another lookup
+    assert tools["cancel_my_reservation"].invoke({"reservation_id": booked["reservation_id"]})["success"]
+
+    tools["get_my_reservations"].invoke({})
+    assert tools["cancel_my_reservation"].invoke({"reservation_id": reservation_id})["success"]
+
+    # a fresh turn starts with nothing looked up
+    fresh = {t.name: t for t in cp.build_account_tools(BOB, "t-1")}
+    assert fresh["cancel_my_reservation"].invoke({"reservation_id": "abc123"})["success"] is False

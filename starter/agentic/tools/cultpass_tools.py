@@ -216,7 +216,13 @@ def manage_subscription(user_id: str, action: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def build_account_tools(user_id: str, ticket_id: str) -> list[StructuredTool]:
-    """Return tools pre-bound to `user_id`, so the agent can only touch this account."""
+    """Return tools pre-bound to `user_id`, so the agent can only touch this account.
+
+    The booking and cancellation tools only accept ids that a lookup tool returned earlier in
+    this turn, so the agent can't act on an id it guessed.
+    """
+    seen_reservation_ids: set[str] = set()
+    seen_experience_ids: set[str] = set()
 
     def get_my_account() -> dict:
         """Get the customer's profile: blocked status, subscription status, tier and remaining monthly quota."""
@@ -224,18 +230,32 @@ def build_account_tools(user_id: str, ticket_id: str) -> list[StructuredTool]:
 
     def get_my_reservations() -> list[dict]:
         """List the customer's reservations (id, status, experience, date)."""
-        return list_reservations(user_id)
+        reservations = list_reservations(user_id)
+        seen_reservation_ids.update(r["reservation_id"] for r in reservations)
+        seen_experience_ids.update(r["experience_id"] for r in reservations)
+        return reservations
 
     def find_experiences(query: str = "", location: str = "") -> list[dict]:
         """Search upcoming experiences with free slots. `query` matches title/description keywords, `location` matches the city/state."""
-        return search_experiences(query=query, location=location)
+        experiences = search_experiences(query=query, location=location)
+        seen_experience_ids.update(e["experience_id"] for e in experiences)
+        return experiences
 
     def book_experience(experience_id: str) -> dict:
-        """Reserve an experience for the customer. Only call after the customer clearly asked to book that specific experience."""
-        return reserve_experience(user_id, experience_id)
+        """Reserve an experience for the customer. Only call after the customer clearly asked to book that specific experience. The id must come from find_experiences."""
+        if experience_id not in seen_experience_ids:
+            return {"success": False, "error": f"Unknown experience id '{experience_id}'. "
+                    "Call find_experiences first and use an id it returns."}
+        result = reserve_experience(user_id, experience_id)
+        if result.get("success"):
+            seen_reservation_ids.add(result["reservation_id"])
+        return result
 
     def cancel_my_reservation(reservation_id: str) -> dict:
-        """Cancel one of the customer's reservations. Only call after confirming which reservation the customer wants cancelled."""
+        """Cancel one of the customer's reservations. Only call after confirming which reservation the customer wants cancelled. The id must come from get_my_reservations."""
+        if reservation_id not in seen_reservation_ids:
+            return {"success": False, "error": f"Unknown reservation id '{reservation_id}'. "
+                    "Call get_my_reservations first and use an id it returns."}
         return cancel_reservation(user_id, reservation_id)
 
     def change_subscription(action: Literal["pause", "resume", "cancel"]) -> dict:
