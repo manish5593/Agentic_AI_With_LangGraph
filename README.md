@@ -15,6 +15,8 @@ A ticket in natural language, plus optional metadata (customer, channel, urgency
 - **Memory**: short-term (the session's conversation, via the checkpointer) and long-term (preferences and
   past tickets, in `udahub.db`)
 
+![UDA-Hub architecture](solution/agentic/design/architecture.svg)
+
 ## Repository layout
 
 | Folder | Contents |

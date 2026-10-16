@@ -18,23 +18,33 @@ Files in this folder:
 The same flow as a Mermaid diagram:
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "15px", "background": "#0f172a", "lineColor": "#94a3b8", "textColor": "#ffffff", "primaryTextColor": "#ffffff", "edgeLabelBackground": "#1e293b", "tertiaryTextColor": "#ffffff"}}}%%
 graph TD
-    START([ticket message + metadata]) --> LC[load_context<br/><i>memory: ticket, customer,<br/>preferences, past tickets</i>]
-    LC --> CL[classifier<br/><i>structured triage</i>]
-    CL --> SU{supervisor<br/><i>identify customer +<br/>rule-based routing</i>}
-    SU -->|how-to / policy| KA[knowledge_agent<br/><i>RAG over KB</i>]
-    SU -->|needs account data/action| AA[account_agent<br/><i>ReAct + CultPass tools</i>]
-    SU -->|guest needs account action| RI[request_info<br/><i>ask for email</i>]
-    SU -->|human requested / critical /<br/>blocked / low confidence| EA[escalation_agent<br/><i>handoff note</i>]
-    KA --> QG{quality_gate<br/><i>confidence & grounding</i>}
+    START([ticket message + metadata]) --> LC[load_context<br/>memory: ticket, customer,<br/>preferences, past tickets]
+    LC --> CL[classifier<br/>structured triage]
+    CL --> SU{supervisor<br/>identify customer +<br/>rule-based routing}
+    SU -->|how-to / policy| KA[knowledge_agent<br/>RAG over KB]
+    SU -->|needs account data/action| AA[account_agent<br/>ReAct + CultPass tools]
+    SU -->|guest needs account action| RI[request_info<br/>ask for email]
+    SU -->|human requested / critical /<br/>blocked / low confidence| EA[escalation_agent<br/>handoff note]
+    KA --> QG{quality_gate<br/>confidence & grounding}
     AA --> QG
     QG -->|approved| AP[approve]
     QG -->|low confidence / needs human /<br/>refund requested| EA
-    AP --> FI[finalize<br/><i>reply + ticket status</i>]
+    AP --> FI[finalize<br/>reply + ticket status]
     EA --> FI
     RI --> FI
-    FI --> WM[write_memory<br/><i>extract durable facts</i>]
-    WM --> END([reply])
+    FI --> WM[write_memory<br/>extract durable facts]
+    WM --> OUT([reply])
+
+    classDef default fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef io fill:#14532d,stroke:#86efac,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef llm fill:#4c1d95,stroke:#c4b5fd,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef escalation fill:#7f1d1d,stroke:#fca5a5,stroke-width:2px,color:#ffffff,font-weight:bold
+    class START,OUT io
+    class CL,KA,AA,QG,WM llm
+    class EA escalation
+    linkStyle default stroke:#94a3b8,stroke-width:2px
 ```
 
 ## Agents

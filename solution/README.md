@@ -9,13 +9,37 @@ The full architecture, routing rules and memory design are in [`agentic/design/R
 
 ## How a ticket flows
 
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "15px", "background": "#0f172a", "lineColor": "#94a3b8", "textColor": "#ffffff", "primaryTextColor": "#ffffff", "edgeLabelBackground": "#1e293b", "tertiaryTextColor": "#ffffff"}}}%%
+flowchart TD
+    IN([ticket + metadata]) --> LC[load_context]
+    LC --> CL[classifier]
+    CL --> SU{supervisor}
+    SU -.->|how-to / policy| KA[knowledge_agent<br/>RAG]
+    SU -.->|account data / action| AA[account_agent<br/>tools]
+    SU -.->|human / critical / blocked| EA[escalation_agent]
+    SU -.->|guest, needs account| RI[request_info]
+    KA --> QG{quality_gate}
+    AA --> QG
+    QG -.->|approved| AP[approve]
+    QG -.->|escalate| EA
+    AP --> FI[finalize]
+    EA --> FI
+    RI --> FI
+    FI --> WM[write_memory]
+    WM --> OUT([reply to customer])
+
+    classDef default fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef io fill:#14532d,stroke:#86efac,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef llm fill:#4c1d95,stroke:#c4b5fd,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef escalation fill:#7f1d1d,stroke:#fca5a5,stroke-width:2px,color:#ffffff,font-weight:bold
+    class IN,OUT io
+    class CL,KA,AA,QG,WM llm
+    class EA escalation
+    linkStyle default stroke:#94a3b8,stroke-width:2px
 ```
-load_context → classifier → supervisor ─┬─> knowledge_agent (RAG) ──┐
-                                        ├─> account_agent (tools) ──┴─> quality_gate ─┬─> approve ─────────┐
-                                        ├─> escalation_agent <────────────────────────┘                    │
-                                        └─> request_info ──────────────────────────────────────────────────┤
-                                                              write_memory <── finalize <──────────────────┘
-```
+
+Purple nodes use the LLM, gray nodes are plain code, red is the escalation to a human, and dashed arrows are conditional routes.
 
 | Agent | What it does |
 |---|---|
