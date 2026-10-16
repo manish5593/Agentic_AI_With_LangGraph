@@ -204,3 +204,17 @@ def test_memory_filter_drops_specific_experiences():
         assert drop_reason(memory) == "account state", memory.content
     # a general taste is still a preference
     assert drop_reason(Memory(category="preference", content="Enjoys samba and live music")) is None
+
+
+def test_reported_urgency_can_raise_but_not_lower_the_routing_urgency():
+    from agentic.agents.supervisor import effective_urgency
+    assert effective_urgency("medium", "critical") == "critical"
+    assert effective_urgency("critical", "low") == "critical"
+    assert effective_urgency("low", None) == "low"
+    assert effective_urgency(None, "bogus") == "medium"
+
+    # the source system marks it critical, the classifier only says medium: still escalated
+    route, reason = route_ticket({**GOOD, "urgency": "medium"}, KNOWN, "open", reported_urgency="critical")
+    assert route == "escalation_agent" and "metadata" in reason
+    # high reported urgency alone doesn't escalate
+    assert route_ticket({**GOOD, "urgency": "low"}, KNOWN, "open", reported_urgency="high")[0] == "knowledge_agent"

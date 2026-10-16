@@ -220,3 +220,11 @@ def test_request_info_follows_the_customer_language(run):
     assert portuguese["route"] == "request_info"
     assert portuguese["final_response"] == "Tap 'Forgot Password' on the login screen."
     assert "(Portuguese)" in portuguese["trace"][-3]
+
+
+def test_critical_urgency_in_metadata_routes_to_a_human(run):
+    graph = run(classification=classification(issue_type="general_info", urgency="medium"))
+    state = process_ticket("The venue is on fire and staff won't let us out", "t-urgent",
+                           {"urgency": "critical", "channel": "phone"}, agent=graph)
+    assert state["route"] == "escalation_agent"
+    assert "reported in the ticket metadata" in state["route_reason"]

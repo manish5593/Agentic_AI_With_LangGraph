@@ -151,7 +151,7 @@ The model's wording varies from run to run, but the routes and outcomes above we
 | Multi-agent architecture (Supervisor, Classifier, Resolvers, Escalation) | [`solution/agentic/agents/`](solution/agentic/agents/), [`solution/agentic/workflow.py`](solution/agentic/workflow.py) |
 | Architecture design | [`solution/agentic/design/README.md`](solution/agentic/design/README.md) |
 | Input handling (text + metadata) | `process_ticket()` in [`workflow.py`](solution/agentic/workflow.py), `load_context` in [`memory_agent.py`](solution/agentic/agents/memory_agent.py) |
-| Routing, RAG, resolve or escalate | [`supervisor.py`](solution/agentic/agents/supervisor.py), [`knowledge_agent.py`](solution/agentic/agents/knowledge_agent.py), [`quality_gate.py`](solution/agentic/agents/quality_gate.py) |
+| Routing, RAG, resolve or escalate | [`supervisor.py`](solution/agentic/agents/supervisor.py), [`knowledge_agent.py`](solution/agentic/agents/knowledge_agent.py), [`quality_gate.py`](solution/agentic/agents/quality_gate.py). Notebook 03 also shows the routing rules on 10 sample tickets. |
 | Tools (incl. internal refund tool) | [`solution/agentic/tools/`](solution/agentic/tools/) |
 | Memory (state, short-term, long-term) | [`memory_agent.py`](solution/agentic/agents/memory_agent.py), [`ticket_tools.py`](solution/agentic/tools/ticket_tools.py), `CustomerMemory` in [`udahub.py`](solution/data/models/udahub.py) |
 | Knowledge base (≥ 14 articles) | [`cultpass_articles.jsonl`](solution/data/external/cultpass_articles.jsonl) (18) |

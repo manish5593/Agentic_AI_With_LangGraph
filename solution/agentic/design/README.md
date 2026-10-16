@@ -98,7 +98,7 @@ One graph run handles one customer message. Each node reads the shared state and
 |---|---|---|---|
 | 1 | `load_context` | `messages`, `metadata`, `thread_id` | `ticket_id`, `customer`, `memories`, `prior_tickets`, `ticket_history`, `ticket_status`, `ticket_issue_type`. It also resets the per-turn fields and saves the customer's message to `udahub.db`. |
 | 2 | `classifier` | conversation, customer context | `classification`: issue type, urgency, sentiment, language, whether account action or a human is needed, any email, confidence |
-| 3 | `supervisor` | `classification`, `customer`, `prior_tickets`, `ticket_status` | `route`, `route_reason`. A guest is linked to their account if the classifier found their email. |
+| 3 | `supervisor` | `classification`, `customer`, `prior_tickets`, `ticket_status`, `metadata.urgency` | `route`, `route_reason`. A guest is linked to their account if the classifier found their email. |
 | 4a | `knowledge_agent` | `classification`, conversation, customer context | `knowledge` (retrieved articles), `draft_response` |
 | 4b | `account_agent` | conversation, customer context | `actions_taken` (every tool call and result), `draft_response` |
 | 4c | `request_info` | `classification` | `final_response` (asks for the customer's email, in their language) |
@@ -115,7 +115,9 @@ The rules are evaluated in order:
 
 1. Ticket already `escalated` → **escalation** (follow-ups are forwarded to the human team)
 2. Customer asked for a human → **escalation**
-3. `legal_or_safety` issue or `critical` urgency → **escalation**
+3. `legal_or_safety` issue, or `critical` urgency → **escalation**. Urgency is the more severe of the classifier's and
+   the one reported in the ticket metadata, so the LLM can raise a ticket's urgency but never lower what the source
+   system reported (`effective_urgency`).
 4. Classifier confidence < `0.5` → **escalation**
 5. Blocked customer whose issue involves their account: login, reservations, subscription, billing, a complaint, or any account action → **escalation** (Trust & Safety policy)
 6. Identified customer reports a blocked account → **escalation**
@@ -205,7 +207,7 @@ state = process_ticket(
 | `metadata.user_name` | No | Name for a newly created user |
 | `metadata.account_id` | No | The platform; defaults to `cultpass` |
 | `metadata.channel` | No | `chat`, `email`, and so on; defaults to `chat` |
-| `metadata.urgency` | No | The urgency reported by the source system. It is shown to the classifier, which sets the final urgency. |
+| `metadata.urgency` | No | The urgency reported by the source system: `low`, `medium`, `high` or `critical`. The classifier sees it, and routing uses the more severe of it and the classifier's urgency, so a ticket reported as `critical` always reaches a human. |
 | `metadata.tags` | No | Initial ticket tags |
 
 `orchestrator` also works with the course-provided `utils.chat_interface(orchestrator, ticket_id)`, which sends
@@ -223,7 +225,7 @@ messages only.
 | Ticket that already exists in `udahub.db` | Its earlier messages are loaded as history |
 | Problem the customer reported before | Escalated straight away as a repeat issue |
 | Ticket already escalated | New messages are forwarded to the human team |
-| Request for a human, legal or safety issue, critical urgency | Escalated straight away |
+| Request for a human, legal or safety issue, critical urgency (classified or reported in metadata) | Escalated straight away |
 | Blocked account with an account issue | Escalated to Trust & Safety, without revealing the reason for the block |
 | Ambiguous or off-topic message (classifier confidence < 0.5) | Escalated rather than guessed at |
 | Message in another language | Classified with its language, and answered in that language. Even `request_info`'s fixed request for an email is translated; English speakers get the fixed text with no extra LLM call. |

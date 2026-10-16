@@ -27,16 +27,30 @@ def repeat_issue_types(state: dict) -> set[str]:
     return types
 
 
+URGENCY_LEVELS = ["low", "medium", "high", "critical"]
+
+
+def effective_urgency(classified, reported) -> str:
+    """The more severe of the classifier's urgency and the urgency reported in the ticket metadata,
+    so the LLM can raise a ticket's urgency but never lower what the source system reported."""
+    levels = [u for u in (classified, reported) if u in URGENCY_LEVELS]
+    return max(levels, key=URGENCY_LEVELS.index) if levels else "medium"
+
+
 def route_ticket(classification: dict, customer: dict, ticket_status: str,
-                 repeat_issues: frozenset = frozenset()) -> tuple[str, str]:
+                 repeat_issues: frozenset = frozenset(), reported_urgency=None) -> tuple[str, str]:
     """Return (route, reason). Pure function so the decision logic is easy to test."""
     c = classification
+    urgency = effective_urgency(c.get("urgency"), reported_urgency)
     if ticket_status == "escalated":
         return "escalation_agent", "ticket is already with the human team; forwarding the new information"
     if c.get("human_requested"):
         return "escalation_agent", "customer asked for a human"
-    if c.get("issue_type") == "legal_or_safety" or c.get("urgency") == "critical":
-        return "escalation_agent", "legal/safety or critical issue requires a human"
+    if c.get("issue_type") == "legal_or_safety":
+        return "escalation_agent", "legal/safety issue requires a human"
+    if urgency == "critical":
+        source = "reported in the ticket metadata" if reported_urgency == "critical" else "classified"
+        return "escalation_agent", f"critical urgency ({source}) requires a human"
     if c.get("confidence", 0) < config.CLASSIFIER_MIN_CONFIDENCE:
         return "escalation_agent", f"classification confidence {c.get('confidence', 0):.2f} is too low"
     if customer.get("identified") and customer.get("is_blocked") and (
@@ -73,7 +87,8 @@ def supervise(state: dict) -> dict:
             state = {**state, "trace": add_trace(state, f"[supervisor] no customer found for {email}")}
 
     route, reason = route_ticket(state["classification"], customer, state.get("ticket_status", "open"),
-                                 frozenset(repeat_issue_types({**state, **update})))
+                                 frozenset(repeat_issue_types({**state, **update})),
+                                 reported_urgency=(state.get("metadata") or {}).get("urgency"))
     update.update(route=route, route_reason=reason,
                   trace=add_trace(state, f"[supervisor] route -> {route}: {reason}"))
     return update

@@ -148,7 +148,7 @@ The project overview for the whole repository is in the [root README](../README.
 |---|---|
 | Multi-agent architecture with LangGraph | `agentic/workflow.py`, `agentic/agents/` |
 | Input handling (text and metadata) | `process_ticket()` in `agentic/workflow.py`, `load_context` in `agentic/agents/memory_agent.py` |
-| Classification and routing | `agentic/agents/classifier.py`, `agentic/agents/supervisor.py` |
+| Classification and routing | `agentic/agents/classifier.py`, `agentic/agents/supervisor.py`. Notebook 03's "Routing decisions for sample tickets" cell shows every rule on 10 sample tickets. |
 | RAG over the knowledge base | `agentic/tools/knowledge_tools.py`, `agentic/agents/knowledge_agent.py` |
 | Tools, including the internal refund tool | `agentic/tools/cultpass_tools.py` |
 | Resolve or escalate | `agentic/agents/quality_gate.py`, `agentic/agents/escalation_agent.py` |
