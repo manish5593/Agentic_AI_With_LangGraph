@@ -6,6 +6,8 @@ agent, and then either resolves it (with RAG and account tools) or escalates it 
 long-term memory throughout.
 
 The full architecture, routing rules and memory design are in [`agentic/design/README.md`](agentic/design/README.md).
+Its [Safeguards](agentic/design/README.md#safeguards-the-llm-proposes-code-decides) section lists every business rule
+and policy that is enforced in code rather than left to the model.
 
 ## How a ticket flows
 
@@ -62,11 +64,16 @@ cd solution
 cp .env.example .env        # add OPENAI_API_KEY (and OPENAI_BASE_URL if using Vocareum)
 ```
 
-1. `01_external_db_setup.ipynb` builds `data/external/cultpass.db`. This is optional: the database is already included.
-2. `02_core_db_setup.ipynb` builds `data/core/udahub.db`. This is also optional, since the database is included.
-3. `03_agentic_app.ipynb` runs the demo scenarios, then an interactive chat (`chat_interface(orchestrator, "1")`).
+Put the key in `.env`, which git ignores, and never in `.env.example`, which is committed.
 
-Re-run notebooks 01 and 02 to reset the databases after the demos, because the demos make real bookings and cancellations.
+`03_agentic_app.ipynb` is committed with the outputs of a real run (see below), so you can review it without a key.
+To run it yourself, open it straight away: both databases are included. It runs the demo scenarios, then an
+interactive chat (`chat_interface(orchestrator, "1")`).
+
+The demos make real changes: bookings and cancellations, plus new tickets and memories. To reset the data, re-run:
+
+1. `01_external_db_setup.ipynb`, which rebuilds `data/external/cultpass.db`
+2. `02_core_db_setup.ipynb`, which rebuilds `data/core/udahub.db`
 
 ## Demo results (notebook 03)
 
@@ -116,13 +123,13 @@ python -m pytest tests
 | Path | Contents |
 |---|---|
 | `agentic/workflow.py` | The LangGraph graph (`orchestrator`) and `process_ticket()` |
-| [`agentic/agents/`](agentic/agents/README.md) | Classifier, supervisor, knowledge and account resolvers, quality gate, escalation, memory |
-| [`agentic/tools/`](agentic/tools/README.md) | CultPass account tools, RAG retriever, ticket and memory storage |
-| [`agentic/design/`](agentic/design/README.md) | Architecture, routing rules and memory design |
+| [`agentic/agents/`](agentic/agents/README.md) | Classifier, supervisor, knowledge and account resolvers, quality gate, escalation, memory. The README covers the memory rules and how to add an agent. |
+| [`agentic/tools/`](agentic/tools/README.md) | CultPass account tools, RAG retriever, ticket and memory storage. The README covers the rules each tool enforces and how to add a tool. |
+| [`agentic/design/`](agentic/design/README.md) | Architecture diagram, Mermaid graph, and the design document: routing rules, resolve-or-escalate logic, memory, and safeguards |
 | `agentic/config.py` | Models, database paths and decision thresholds |
 | `agentic/state.py` | Graph state and structured-output schemas |
-| [`data/core/`](data/core/README.md) | `udahub.db`: tables, ticket statuses and demo data |
-| [`data/external/`](data/external/README.md) | `cultpass.db`, the JSONL seed data and the demo customers |
+| [`data/core/`](data/core/README.md) | `udahub.db`: tables, committed contents, how the agents write to it, and adding articles |
+| [`data/external/`](data/external/README.md) | `cultpass.db`, the JSONL seed data, the demo customers, resetting, and adding data |
 | `data/models/` | SQLAlchemy models for both databases |
 | `tests/` | Unit tests and end-to-end graph tests |
 | `utils.py` | Starter helpers, including `chat_interface` |
@@ -142,3 +149,5 @@ The project overview for the whole repository is in the [root README](../README.
 | Memory: state, short-term and long-term | `agentic/state.py`, `agentic/agents/memory_agent.py`, `agentic/tools/ticket_tools.py`, `CustomerMemory` in `data/models/udahub.py` |
 | At least 14 knowledge articles | `data/external/cultpass_articles.jsonl` (18 articles) |
 | Configuration and thresholds | `agentic/config.py` (overridable with env vars) |
+| Safeguards enforced in code | [`agentic/design/README.md`](agentic/design/README.md#safeguards-the-llm-proposes-code-decides) |
+| Demo run with outputs | `03_agentic_app.ipynb`, summarised under [Demo results](#demo-results-notebook-03) |
