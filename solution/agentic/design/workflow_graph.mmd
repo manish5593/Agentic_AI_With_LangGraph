@@ -1,0 +1,43 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	load_context(load_context)
+	classifier(classifier)
+	supervisor(supervisor)
+	knowledge_agent(knowledge_agent)
+	account_agent(account_agent)
+	quality_gate(quality_gate)
+	approve(approve)
+	escalation_agent(escalation_agent)
+	request_info(request_info)
+	finalize(finalize)
+	write_memory(write_memory)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> load_context;
+	account_agent --> quality_gate;
+	approve --> finalize;
+	classifier --> supervisor;
+	escalation_agent --> finalize;
+	finalize --> write_memory;
+	knowledge_agent --> quality_gate;
+	load_context --> classifier;
+	quality_gate -.-> approve;
+	quality_gate -.-> escalation_agent;
+	request_info --> finalize;
+	supervisor -.-> account_agent;
+	supervisor -.-> escalation_agent;
+	supervisor -.-> knowledge_agent;
+	supervisor -.-> request_info;
+	write_memory --> __end__;
+	classDef default fill:#2d3748,stroke:#a0aec0,stroke-width:1.5px,color:#f7fafc,line-height:1.2
+	classDef first fill:#1f4d36,stroke:#6fcf97,stroke-width:1.5px,color:#f7fafc
+	classDef last fill:#1f4d36,stroke:#6fcf97,stroke-width:1.5px,color:#f7fafc
+	classDef llm fill:#3b2f6b,stroke:#a58cff,stroke-width:1.5px,color:#f7fafc
+	classDef escalation fill:#6b2a24,stroke:#f08a7e,stroke-width:1.5px,color:#f7fafc
+	class classifier,knowledge_agent,account_agent,quality_gate,write_memory llm
+	class escalation_agent escalation
+	linkStyle default stroke:#a0aec0,stroke-width:1.5px

@@ -5,6 +5,18 @@ accounts it serves (currently **CultPass**). It reads tickets in natural languag
 metadata. It routes each one to a specialised agent, which resolves it with RAG and account tools or
 escalates it to a human. Throughout, it uses short- and long-term memory.
 
+![UDA-Hub architecture](architecture.svg)
+
+Files in this folder:
+
+| File | Contents |
+|---|---|
+| `architecture.svg` | The architecture diagram above: agents, decision paths, tools, data stores and memory |
+| `workflow_graph.mmd` | Mermaid source exported from the compiled graph (`orchestrator.get_graph().draw_mermaid()`), with a dark `classDef` color scheme added at the end (same color meaning as `architecture.svg`). Re-apply them if you regenerate the file. |
+| `README.md` | This design document |
+
+The same flow as a Mermaid diagram:
+
 ```mermaid
 graph TD
     START([ticket message + metadata]) --> LC[load_context<br/><i>memory: ticket, customer,<br/>preferences, past tickets</i>]
