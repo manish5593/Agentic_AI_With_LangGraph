@@ -78,6 +78,24 @@ python -m pytest tests
   - multi-turn identification, recalling both short-term and long-term memory
   - a refund request that forces escalation and writes a new memory
 
+## Folder guide
+
+| Path | Contents |
+|---|---|
+| `agentic/workflow.py` | The LangGraph graph (`orchestrator`) and `process_ticket()` |
+| [`agentic/agents/`](agentic/agents/README.md) | Classifier, supervisor, knowledge and account resolvers, quality gate, escalation, memory |
+| [`agentic/tools/`](agentic/tools/README.md) | CultPass account tools, RAG retriever, ticket and memory storage |
+| [`agentic/design/`](agentic/design/README.md) | Architecture, routing rules and memory design |
+| `agentic/config.py` | Models, database paths and decision thresholds |
+| `agentic/state.py` | Graph state and structured-output schemas |
+| [`data/core/`](data/core/README.md) | `udahub.db`: tables, ticket statuses and demo data |
+| [`data/external/`](data/external/README.md) | `cultpass.db`, the JSONL seed data and the demo customers |
+| `data/models/` | SQLAlchemy models for both databases |
+| `tests/` | Unit tests and end-to-end graph tests |
+| `utils.py` | Starter helpers, including `chat_interface` |
+
+The project overview for the whole repository is in the [root README](../README.md).
+
 ## Where to find each requirement
 
 | Requirement | Location |
