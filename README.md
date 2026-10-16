@@ -49,6 +49,7 @@ solution/
 
 | README | What it covers |
 |---|---|
+| [`report.md`](report.md) | Project report: architecture, results, the problems found in real-model testing and how each was fixed, lessons, and limitations |
 | [`solution/README.md`](solution/README.md) | Project guide: ticket flow, demo results, and where each requirement is met |
 | [`agentic/design/`](solution/agentic/design/README.md) | Architecture, routing rules, resolve-or-escalate logic, memory, and safeguards |
 | [`agentic/agents/`](solution/agentic/agents/README.md) | Each agent node, the long-term memory rules, and how to add an agent |
