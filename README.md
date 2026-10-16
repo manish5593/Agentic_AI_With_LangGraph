@@ -140,7 +140,7 @@ committed in both `starter/` and `solution/`.
 
 The safeguards each did their job during the run:
 
-- **Id guard:** in scenario 2 the agent first tried to cancel with an id it guessed. The tool refused it, and the agent looked the reservation up before cancelling.
+- **Id guard:** in most of our runs of scenario 2, the agent first tried to cancel with an id it guessed. The tool refused it, and the agent looked the reservation up before cancelling. In other runs, including the committed one, the agent looked it up first. Either way the outcome is the same, and `test_account_tools_refuse_ids_not_looked_up` checks the guard directly.
 - **Policy escalation:** refunds and blocked accounts always reached a human, whatever the model drafted.
 - **Repeat issues:** in scenario 6 Bob's previous ticket was a login problem, so the supervisor escalated him straight away. This took the same route in 4 out of 4 runs.
 - **Memory hygiene:** memories are third-person summaries of what the customer wrote, never the assistant's replies. Reservation state, named experiences, one-off requests, contact details and duplicates are not stored.

@@ -91,9 +91,11 @@ The demos make real changes: bookings and cancellations, plus new tickets and me
 | 7 | Bob asks for a recommendation | account_agent → `find_experiences` → real Rio experiences matching his stored preference and premium tier | None |
 | 8 | Customer demands a human | Escalated immediately | None (one-off request) |
 
-In scenario 2 the agent first tried to cancel with a guessed id. The tool refused it, and the agent looked the
-reservation up before cancelling. The model's wording varies between runs, but the routes and outcomes were the
-same across repeated runs.
+In most of our runs of scenario 2, the agent first tried to cancel with a guessed id. The tool refused it, and
+the agent looked the reservation up before cancelling. In other runs, including the committed one, it looked the
+reservation up first. The outcome is the same either way, and `test_account_tools_refuse_ids_not_looked_up`
+checks the guard directly. The model's wording varies between runs, but the routes and outcomes were the same
+across repeated runs.
 
 ## Tests
 
