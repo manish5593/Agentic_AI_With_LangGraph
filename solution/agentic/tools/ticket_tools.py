@@ -1,4 +1,5 @@
 """Ticket persistence and long-term customer memory in the core (udahub) database."""
+import re
 import uuid
 from typing import Optional
 
@@ -170,15 +171,22 @@ def get_memories(udahub_user_id: str, limit: int = config.MAX_MEMORIES) -> list[
         return [{"category": m.category, "content": m.content} for m in rows]
 
 
+def _normalize(text: str) -> str:
+    """Lowercase and drop punctuation and extra spaces, so trivial variants compare equal."""
+    return " ".join(re.sub(r"[^\w\s]", " ", text.casefold()).split())
+
+
 def save_memory(account_id: str, udahub_user_id: str, category: str, content: str, source_ticket_id: str) -> bool:
-    """Store a memory unless an identical one exists. Returns True if stored."""
+    """Store a memory unless the customer already has the same one. Returns True if stored.
+
+    Comparison ignores case, punctuation and spacing, so "Likes jazz." duplicates "likes jazz".
+    """
+    key = _normalize(content)
+    if not key:
+        return False
     with session_scope(udahub_engine()) as session:
-        exists = (
-            session.query(udahub.CustomerMemory)
-            .filter_by(user_id=udahub_user_id, content=content.strip())
-            .first()
-        )
-        if exists:
+        existing = session.query(udahub.CustomerMemory.content).filter_by(user_id=udahub_user_id).all()
+        if any(_normalize(row.content) == key for row in existing):
             return False
         session.add(
             udahub.CustomerMemory(

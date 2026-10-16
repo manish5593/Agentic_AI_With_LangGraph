@@ -161,3 +161,12 @@ def test_memory_filter_drops_one_off_human_requests():
     for text in ["Prefers to be contacted by email", "Reported being charged twice (refund requested)",
                  "Is a human rights lawyer"]:
         assert drop_reason(Memory(category="personal_fact", content=text)) is None
+
+
+def test_duplicate_memories_ignore_case_and_punctuation():
+    uid = tt.get_or_create_ticket("t-dup", {"external_user_id": BOB, "user_name": "Bob Stone"})["udahub_user_id"]
+    seeded = "Enjoys music and dance experiences, especially in Rio de Janeiro"
+    for variant in [seeded + ".", seeded.upper(), "  enjoys music and dance experiences especially in rio de janeiro!! ", ""]:
+        assert tt.save_memory("cultpass", uid, "preference", variant, "t-dup") is False, variant
+    assert tt.save_memory("cultpass", uid, "preference", "Enjoys jazz in Sao Paulo", "t-dup") is True
+    assert sum("music and dance" in m["content"] for m in tt.get_memories(uid)) == 1
