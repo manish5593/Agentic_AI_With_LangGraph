@@ -7,6 +7,7 @@
 Short-term memory (the session's conversation) is kept by the LangGraph checkpointer,
 keyed by `thread_id` (= ticket id).
 """
+import re
 from typing import Literal
 
 from langchain_core.messages import AIMessage, SystemMessage
@@ -156,6 +157,18 @@ Latest exchange:
 {exchange}"""
 
 
+# Account state the system can look up live; stored as memory it only goes stale.
+_ACCOUNT_STATE = re.compile(r"\b(reserv\w*|book(ed|ing|ings)?|cancel\w*|quota)\b", re.IGNORECASE)
+
+
+def is_account_state(memory: Memory) -> bool:
+    """True for memories about reservations, bookings, cancellations or quota.
+
+    Preferences are exempt, so "likes to book concerts" is still kept.
+    """
+    return memory.category != "preference" and bool(_ACCOUNT_STATE.search(memory.content))
+
+
 def write_memory(state: dict) -> dict:
     customer = state.get("customer") or {}
     if not customer.get("identified"):
@@ -167,10 +180,14 @@ def write_memory(state: dict) -> dict:
             exchange=conversation_text(state),
         ))
     ])
+    dropped = [m.content for m in result.memories if is_account_state(m)]
     stored = [
         m.content for m in result.memories
-        if ticket_tools.save_memory(
+        if not is_account_state(m) and ticket_tools.save_memory(
             customer["account_id"], customer["udahub_user_id"], m.category, m.content, state["ticket_id"]
         )
     ]
-    return {"trace": add_trace(state, f"[memory] stored {len(stored)} new memories: {stored}")}
+    entry = f"[memory] stored {len(stored)} new memories: {stored}"
+    if dropped:
+        entry += f" (dropped account state: {dropped})"
+    return {"trace": add_trace(state, entry)}

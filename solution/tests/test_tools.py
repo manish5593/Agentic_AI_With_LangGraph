@@ -110,3 +110,21 @@ def test_escalation_rules():
     assert should_escalate({"assessment": {**ok, "needs_human": True}})[0] is True
     refund = [{"tool": "request_refund", "args": {}, "result": {"success": True}}]
     assert should_escalate({"assessment": ok, "actions_taken": refund})[0] is True
+
+
+def test_memory_filter_drops_account_state():
+    from agentic.agents.memory_agent import Memory, is_account_state
+    stale = [
+        Memory(category="issue_history", content="Requested to cancel a reservation."),
+        Memory(category="personal_fact", content="Has an upcoming reservation for Sunset Paddleboarding."),
+        Memory(category="personal_fact", content="Booked the Samba Night at Lapa."),
+        Memory(category="issue_history", content="Used all of the monthly quota."),
+    ]
+    kept = [
+        Memory(category="issue_history", content="Requested a refund for a double charge on subscription."),
+        Memory(category="preference", content="Likes to book concerts and jazz nights."),
+        Memory(category="preference", content="Prefers replies in Portuguese."),
+        Memory(category="personal_fact", content="Uses a wheelchair; needs accessible venues."),
+    ]
+    assert all(is_account_state(m) for m in stale)
+    assert not any(is_account_state(m) for m in kept)

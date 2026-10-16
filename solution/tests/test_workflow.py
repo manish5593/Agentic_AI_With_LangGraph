@@ -159,3 +159,17 @@ def test_refund_request_forces_escalation_and_memory_is_stored(run, monkeypatch)
     assert any(t.startswith("Refund request RF-") for t in texts)
     uid = state["customer"]["udahub_user_id"]
     assert any("duplicate charge" in m["content"] for m in ticket_tools.get_memories(uid))
+
+
+def test_account_state_memories_are_not_stored(run):
+    memories = MemoryExtraction(memories=[
+        Memory(category="personal_fact", content="Has a reservation for Samba Night on October 20."),
+        Memory(category="preference", content="Prefers replies in Portuguese"),
+    ])
+    graph = run(classification=classification(issue_type="general_info"), memories=memories)
+    state = process_ticket("What's included in my plan?", "t-mem", {"email": "bob.stone@granite.com"}, agent=graph)
+
+    stored = [m["content"] for m in ticket_tools.get_memories(state["customer"]["udahub_user_id"])]
+    assert "Prefers replies in Portuguese" in stored
+    assert not any("Samba" in m for m in stored)
+    assert "dropped account state" in state["trace"][-1]
