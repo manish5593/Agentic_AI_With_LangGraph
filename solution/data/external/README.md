@@ -38,3 +38,19 @@ The demos in notebook 03 make real changes: Cathy's reservation is cancelled, fo
 reset the database. It pins the subscriptions and reservations of Bob, Cathy, Eva and Frank. Alice's and David's
 subscriptions, Alice's reservations and the number of free slots are random, so they will differ from the table
 above after a reset.
+
+## Adding data
+
+- **Customers:** add a line to `cultpass_users.jsonl` with `id`, `name`, `email` and `is_blocked`, using a unique id and email,
+  then re-run notebook 01. New
+  customers get a random subscription. To make it fixed, add the id to `demo_subscriptions` in the notebook's demo
+  data cell.
+- **Experiences:** add a line to `cultpass_experiences.jsonl` with `title`, `description` and `location`, then
+  re-run notebook 01. Each experience's date is its position plus one day from now, and every other experience
+  (positions 0, 2, 4…) is premium. Append new ones at the end so the existing experiences, and the demo
+  reservations that are picked by position, stay the same.
+- **Knowledge articles:** see [`../core/README.md`](../core/README.md#adding-data). They're stored in this folder
+  but loaded into `udahub.db`.
+
+Experience and reservation ids are regenerated on every rebuild. No table in `udahub.db` references them, so
+rebuilding notebook 01 on its own is safe.

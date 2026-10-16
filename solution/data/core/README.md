@@ -34,3 +34,15 @@ recommendations that match his preference.
 - Memories are only stored for identified customers, as third-person summaries. Reservation state, one-off requests and duplicates are filtered out (see [`agentic/agents/README.md`](../../agentic/agents/README.md)).
 
 Re-run notebook 02 to reset the database. This deletes any tickets and memories the agents created.
+
+## Adding data
+
+- **Knowledge articles:** add a line to `../external/cultpass_articles.jsonl` with `title`, `content` and `tags`
+  (comma-separated), then re-run notebook 02. The notebook requires at least 14 articles. Ending an article with a
+  `**Suggested phrasing:**` block, as the existing ones do, gives the knowledge agent wording to adapt. The
+  retriever builds its embedding index once per Python process, so restart the notebook kernel to pick up new
+  articles.
+- **Another account:** create an `Account` row and its `Knowledge` rows in notebook 02, then pass
+  `{"account_id": "<id>"}` in the ticket metadata. Tickets for an unknown account fail with a clear error. Knowledge
+  search is per account, but the account agent's tools only work with CultPass data, so a new platform also needs
+  its own tools in `agentic/tools/`.
