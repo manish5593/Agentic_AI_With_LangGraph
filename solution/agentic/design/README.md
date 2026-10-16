@@ -153,6 +153,7 @@ Thresholds are set in `agentic/config.py` and can be overridden with env vars.
 | **State** | `UdaHubState` (LangGraph) | Classification, route, retrieved articles, tool actions, assessment and trace for the current step of the execution. |
 | **Short-term** | `MemorySaver` checkpointer, keyed by `thread_id` = ticket id | The session's conversation, customer and metadata, so follow-ups ("cancel *that one*") work within a session. |
 | **Long-term** | `udahub.db`: `customer_memory` table, plus `tickets` and `ticket_messages` | Customer preferences, personal facts and reported issues, previous tickets (issue, status, last reply) and the full message log. These are recalled at the start of every new ticket for that customer. Only facts the customer stated are stored. State the system can look up live, such as reservations, is never stored, so it can't go stale. |
+| **Inspection by `thread_id`** | The checkpointer | `orchestrator.get_state(config)` returns a ticket's messages, tool usage (`actions_taken`) and decision `trace`; `get_state_history(config)` returns every checkpoint, which shows the order the nodes ran in. |
 | **Recovery after a restart** | `ticket_messages` in `udahub.db` | The checkpointer is in memory only. When a new session starts on an existing ticket, `load_context` reloads the ticket's saved messages as `ticket_history`, so the conversation continues. |
 
 ## Tools (`agentic/tools`)

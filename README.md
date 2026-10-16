@@ -73,7 +73,7 @@ cp .env.example .env          # then add your OPENAI_API_KEY (and OPENAI_BASE_UR
 
 Put your key in `.env`, which git ignores, and never in `.env.example`, which is committed.
 
-Both databases are committed, so you can open `03_agentic_app.ipynb` straight away. It runs 11 demo scenarios and
+Both databases are committed, so you can open `03_agentic_app.ipynb` straight away. It runs 13 demo scenarios and
 then an interactive chat. The other two notebooks rebuild the databases, so run them only to reset the data:
 the demos make real bookings and cancellations, and store tickets and memories.
 
@@ -120,7 +120,7 @@ The tests need no API key. Each one runs against a temporary copy of the databas
 
 ## Demo Results
 
-These are the results of running the 11 scenarios in `03_agentic_app.ipynb` against the real model (`gpt-4o-mini`
+These are the results of running the 13 scenarios in `03_agentic_app.ipynb` against the real model (`gpt-4o-mini`
 with `text-embedding-3-small` for retrieval). The executed notebook, with every decision trace and reply, is
 committed in `solution/`.
 
@@ -137,6 +137,8 @@ committed in `solution/`.
 | 9 | Guest says the app keeps crashing | knowledge agent (top article: App Crashes and Technical Problems, 0.55) | Answered with the article's steps; waits for the customer to try them | None (guest) |
 | 10 | Guest asks about a student discount | knowledge agent: no article above the 0.30 threshold | Escalated: "no relevant knowledge base article found" | None (guest) |
 | 11 | Guest asks about parking at venues | knowledge agent: only related articles (QR codes, 0.41) | Escalated: the quality gate found the articles don't answer the question | None (guest) |
+| 12 | Frank says he loves outdoor activities | account agent: `find_experiences` | Answered, and the preference was stored in long-term memory | "Likes outdoor activities and nature" |
+| 13 | Frank asks for recommendations, in a new session | account agent, with the preference recalled from `udahub.db` | Suggested outdoor experiences from the catalog | None (already known) |
 
 The safeguards each did their job during the run:
 
@@ -157,7 +159,7 @@ The model's wording varies from run to run, but the routes and outcomes above we
 | Input handling (text + metadata) | `process_ticket()` in [`workflow.py`](solution/agentic/workflow.py), `load_context` in [`memory_agent.py`](solution/agentic/agents/memory_agent.py) |
 | Routing, RAG, resolve or escalate | [`supervisor.py`](solution/agentic/agents/supervisor.py), [`knowledge_agent.py`](solution/agentic/agents/knowledge_agent.py), [`quality_gate.py`](solution/agentic/agents/quality_gate.py). Notebook 03 also shows the routing rules on 10 sample tickets. |
 | Tools (incl. internal refund tool) | [`solution/agentic/tools/`](solution/agentic/tools/). Notebook 03 also calls each tool on sample operations, including its error cases. |
-| Memory (state, short-term, long-term) | [`memory_agent.py`](solution/agentic/agents/memory_agent.py), [`ticket_tools.py`](solution/agentic/tools/ticket_tools.py), `CustomerMemory` in [`udahub.py`](solution/data/models/udahub.py). Notebook 03 shows a returning customer's stored history, and a fresh session picking up a ticket from the database. |
+| Memory (state, short-term, long-term) | [`memory_agent.py`](solution/agentic/agents/memory_agent.py), [`ticket_tools.py`](solution/agentic/tools/ticket_tools.py), `CustomerMemory` in [`udahub.py`](solution/data/models/udahub.py). Notebook 03 shows a returning customer's stored history, a fresh session picking up a ticket from the database, inspecting a ticket by `thread_id`, and a preference learned in one session and used in another (scenarios 12 and 13). |
 | Knowledge base (≥ 14 articles) | [`cultpass_articles.jsonl`](solution/data/external/cultpass_articles.jsonl) (18) |
 | Demo (committed with outputs) | [`03_agentic_app.ipynb`](solution/03_agentic_app.ipynb) |
 | Safeguards enforced in code | [Safeguards](solution/agentic/design/README.md#safeguards-the-llm-proposes-code-decides) |

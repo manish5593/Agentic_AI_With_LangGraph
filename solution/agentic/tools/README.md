@@ -20,8 +20,9 @@ LLM can never act on another customer's account. The tools are rebuilt on every 
 | `change_subscription` | Pauses, resumes or cancels the subscription | Only valid state changes are allowed. Blocked accounts can't make changes. |
 | `request_refund` | Registers a refund request as a system message on the ticket and returns a reference such as `RF-1A2B3C` | It doesn't issue a refund. Its use always escalates the ticket (`ESCALATING_TOOLS`), because refunds need support-lead approval. |
 
-An id that wasn't looked up gets an error telling the agent which lookup to call. The error is returned rather
-than raised, so the agent can recover.
+An id that wasn't looked up gets an error telling the agent which lookup to call. If the agent has already done
+the lookup, the error lists the valid ids with their labels, because the usual mistake is passing a list position
+such as `"0"` instead of the id. The error is returned rather than raised, so the agent retries with the right id.
 
 ### Error handling and validation
 

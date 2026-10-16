@@ -246,3 +246,12 @@ def test_experience_search_marks_what_the_customer_already_booked():
     results = {e["title"]: e["already_booked"] for e in tools["find_experiences"].invoke({})}
     assert results["Samba Night at Lapa"] is True  # in Bob's seeded reservations
     assert results["Modern Art at MASP"] is False
+
+
+def test_unknown_id_error_lists_the_valid_ids():
+    tools = {t.name: t for t in cp.build_account_tools(BOB, "t-1")}
+    reservations = tools["get_my_reservations"].invoke({})
+    # the agent passing a list position instead of an id
+    error = tools["cancel_my_reservation"].invoke({"reservation_id": "0"})["error"]
+    assert "not a position" in error
+    assert all(r["reservation_id"] in error for r in reservations)

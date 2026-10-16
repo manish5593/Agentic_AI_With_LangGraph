@@ -93,6 +93,8 @@ The demos make real changes: bookings and cancellations, plus new tickets and me
 | 9 | Guest says the app keeps crashing | knowledge_agent (App Crashes article, 0.55) → answered with its steps | None (guest) |
 | 10 | Guest asks about a student discount | knowledge_agent finds no article above 0.30 → escalated ("no relevant knowledge base article found") | None (guest) |
 | 11 | Guest asks about parking | knowledge_agent finds only related articles → quality gate: they don't answer it → escalated | None (guest) |
+| 12 | Frank says he loves outdoor activities | account_agent answers; the preference is stored in long-term memory | "Likes outdoor activities and nature" |
+| 13 | Frank asks for recommendations, in a new session | account_agent, with the preference recalled from `udahub.db` → outdoor experiences | None (already known) |
 
 In most of our runs of scenario 2, the agent first tried to cancel with a guessed id. The tool refused it, and
 the agent looked the reservation up before cancelling. In other runs, including the committed one, it looked the
@@ -155,7 +157,7 @@ The project overview for the whole repository is in the [root README](../README.
 | RAG over the knowledge base | `agentic/tools/knowledge_tools.py`, `agentic/agents/knowledge_agent.py`. Notebook 03 shows retrieval for six ticket types, and scenarios 9–11 show answering and both kinds of knowledge-gap escalation. |
 | Tools, including the internal refund tool | `agentic/tools/cultpass_tools.py`. Notebook 03's "Support tools on sample operations" cell calls each tool, including its validation and error cases. |
 | Resolve or escalate | `agentic/agents/quality_gate.py`, `agentic/agents/escalation_agent.py` |
-| Memory: state, short-term and long-term | `agentic/state.py`, `agentic/agents/memory_agent.py`, `agentic/tools/ticket_tools.py`, `CustomerMemory` in `data/models/udahub.py`. Notebook 03's "Persistent memory" cells show a returning customer's stored history, and a fresh session (empty checkpointer) picking up a ticket from `udahub.db`. |
+| Memory: state, short-term and long-term | `agentic/state.py`, `agentic/agents/memory_agent.py`, `agentic/tools/ticket_tools.py`, `CustomerMemory` in `data/models/udahub.py`. Notebook 03's "Persistent memory" cells show a returning customer's stored history, a fresh session (empty checkpointer) picking up a ticket from `udahub.db`, inspecting a ticket by `thread_id` (messages, tool usage, trace, node order), and a preference learned in one session and used in another (scenarios 12 and 13). |
 | At least 14 knowledge articles | `data/external/cultpass_articles.jsonl` (18 articles) |
 | Configuration and thresholds | `agentic/config.py` (overridable with env vars) |
 | Safeguards enforced in code | [`agentic/design/README.md`](agentic/design/README.md#safeguards-the-llm-proposes-code-decides) |
