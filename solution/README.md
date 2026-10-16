@@ -46,10 +46,10 @@ Purple nodes use the LLM, gray nodes are plain code, red is the escalation to a 
 | **Classifier** | Gives the ticket a structured classification: issue type, urgency, sentiment, language, whether account action is needed, and confidence |
 | **Supervisor** | Identifies the customer (from metadata or an email in the conversation) and routes the ticket with deterministic rules |
 | **Knowledge agent** | Answers how-to and policy questions with RAG over the 18 knowledge base articles |
-| **Account agent** | A ReAct agent with CultPass tools bound to the current customer: account, reservations, booking, cancellation, subscription changes and refund requests |
+| **Account agent** | A ReAct agent with CultPass tools bound to the current customer: account, reservations, booking, cancellation, subscription changes and refund requests. Booking and cancellation only accept ids that a lookup returned in the same turn |
 | **Quality gate** | Scores the draft reply for confidence and checks that it is backed by the articles or tool results. It escalates on low confidence (< 0.7), an unsupported draft, or a policy that needs a human (such as a refund) |
 | **Escalation agent** | Picks the human team and priority, saves a handoff note on the ticket, and replies to the customer |
-| **Memory** | Short-term: the conversation per ticket thread (`MemorySaver`). Long-term: customer preferences (`customer_memory` table) and previous tickets in `udahub.db` |
+| **Memory** | Short-term: the conversation per ticket thread (`MemorySaver`). Long-term: customer preferences and reported issues (`customer_memory` table) and previous tickets in `udahub.db`. Reservation state, one-off requests and duplicates are filtered out |
 
 ## Running it
 
@@ -68,18 +68,25 @@ cp .env.example .env        # add OPENAI_API_KEY (and OPENAI_BASE_URL if using V
 
 Re-run notebooks 01 and 02 to reset the databases after the demos, because the demos make real bookings and cancellations.
 
-## Demo scenarios (notebook 03)
+## Demo results (notebook 03)
 
-| # | Ticket | Expected path |
-|---|---|---|
-| 1 | Guest asks what a subscription includes | classifier → knowledge_agent (RAG) → resolved |
-| 2 | Cathy asks about her reservations, then "cancel that one" | account_agent with tools, and the follow-up relies on short-term memory |
-| 3 | Guest asks to book Samba Night, then gives their email | request_info → customer identified → account_agent |
-| 4 | Alice (blocked account) can't log in | supervisor → escalation to Trust & Safety, without revealing why the account is blocked |
-| 5 | Frank was charged twice | account_agent → `request_refund` → escalation for support-lead approval |
-| 6 | Bob still can't log in | His previous login ticket is recalled from long-term memory, the documented fix has already failed, and the ticket is escalated |
-| 7 | Bob asks for a recommendation | Uses his stored preference (music and dance in Rio) |
-| 8 | Customer demands a human | Escalated immediately |
+`03_agentic_app.ipynb` is committed with the outputs of a run against the real model (`gpt-4o-mini`, with
+`text-embedding-3-small` for retrieval), so you can read every decision trace and reply without running it.
+
+| # | Ticket | What happened | Long-term memory |
+|---|---|---|---|
+| 1 | Guest asks what a subscription includes | knowledge_agent (top article scored 0.78) → resolved | None (guest) |
+| 2 | Cathy asks about her reservations, then "cancel that one" | account_agent lists them, then cancels on the follow-up (short-term memory) → resolved | Cancellation dropped by the filter |
+| 3 | Guest asks to book Samba Night, then gives their email | request_info → Bob identified → account_agent finds he already has that booking | None (no duplicate preference) |
+| 4 | Alice (blocked account) can't log in | supervisor → escalated to Trust & Safety without revealing the reason for the block | Login issue recorded |
+| 5 | Frank was charged twice | account_agent → `request_refund` → escalated to billing for support-lead approval | Refund request recorded |
+| 6 | Bob still can't log in | knowledge_agent → quality gate wants a human → escalated to technical support | Login issue recorded |
+| 7 | Bob asks for a recommendation | account_agent → `find_experiences` → real Rio experiences matching his stored preference and premium tier | None |
+| 8 | Customer demands a human | Escalated immediately | None (one-off request) |
+
+In scenario 2 the agent first tried to cancel with a guessed id. The tool refused it, and the agent looked the
+reservation up before cancelling. The model's wording varies between runs, but the routes and outcomes were the
+same across repeated runs.
 
 ## Tests
 
@@ -91,8 +98,9 @@ python -m pytest tests
 
 - `tests/test_tools.py` covers:
   - the tool business rules: blocked accounts, inactive subscriptions, double booking, ownership, quota and subscription transitions
-  - account tools bound to one customer
+  - account tools bound to one customer, which refuse ids that weren't looked up in the same turn
   - ticket and memory persistence
+  - the memory filters (reservation state, one-off requests) and the duplicate check
   - keyword retrieval
   - every routing and escalation rule
 - `tests/test_workflow.py` runs the whole graph end to end through these paths:
@@ -101,6 +109,7 @@ python -m pytest tests
   - a blocked customer
   - multi-turn identification, recalling both short-term and long-term memory
   - a refund request that forces escalation and writes a new memory
+  - a reservation-state memory that is filtered out before it is stored
 
 ## Folder guide
 
